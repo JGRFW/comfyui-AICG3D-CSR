@@ -1,0 +1,157 @@
+{
+  "1": {
+    "class_type": "CSRModelLoader",
+    "inputs": {
+      "fl2va_model": "MiniMax\\DasiwaMinimaxH3_dasiwaREF2VAHybridV1_0.safetensors",
+      "ref2va_model": "MiniMax\\DasiwaMinimaxH3_dasiwaREF2VAHybridV1_0.safetensors",
+      "task_mode": "Ref2VA（推荐）",
+      "text_encoder": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+      "video_vae": "minimax_h3_video_vae_int8_convrot.safetensors",
+      "audio_vae": "minimax_h3_audio_vae_fp32.safetensors",
+      "attention_mode": "ComfyUI 默认",
+      "lora_1": "minimax\\minimax_h3_turbo_v4_step600_ema_DasiwaREF2VAHybridV1_0_curveproj1025_compat_v001.safetensors",
+      "lora_1_strength": 1.0,
+      "lora_2": "minimax\\h3_character_swap_pro4500_1000.safetensors",
+      "lora_2_strength": 1.0,
+      "lora_3": "none",
+      "lora_3_strength": 1.0,
+      "lora_4": "none",
+      "lora_4_strength": 1.0,
+      "lora_5": "none",
+      "lora_5_strength": 1.0,
+      "lora_6": "none",
+      "lora_6_strength": 1.0,
+      "lora_7": "none",
+      "lora_7_strength": 1.0,
+      "lora_8": "none",
+      "lora_8_strength": 1.0
+    },
+    "_meta": {
+      "title": "MiniMax H3 Aicg 加载器 · CSR独立版"
+    }
+  },
+  "2": {
+    "class_type": "CSRVideoCrop",
+    "inputs": {
+      "video_state": "{}",
+      "segment_ranges": "[{\"start\": 0, \"end\": 10.0}]",
+      "short_edge": 480,
+      "resolution_preset": "540P",
+      "custom_width": 0,
+      "custom_height": 0,
+      "context_frames": 22,
+      "seam_blend_frames": 3,
+      "encoder": "libx264（CPU·稳定）",
+      "test_seconds": 0.0,
+      "aspect_ratio": "16:9",
+      "model_bundle": [
+        "1",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Aicg 视频裁剪 · CSR独立版"
+    }
+  },
+  "3": {
+    "class_type": "CSRMediaAssets",
+    "inputs": {
+      "asset_state": "{}",
+      "character_bindings": "the target person or object corresponding to replacement reference 1 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 2 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 3 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 4 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 5 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 6 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 7 in the first frame; track this same target thereafter and do not substitute unrelated content",
+      "video_bundle": [
+        "2",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "MiniMax H3 Aicg资源库 · CSR独立版"
+    }
+  },
+  "4": {
+    "class_type": "CSRSegmentReplace",
+    "inputs": {
+      "description": "把画面中的目标人物替换为上传人物参考图（若上传背景图则同时替换环境）；保留原视频的镜头、身体动作、口型、人物站位与互动节奏，不增加原视频没有的动作。",
+      "replacement_tags": "自定义",
+      "steps": 8,
+      "sampler_name": "er_sde",
+      "scheduler": "beta",
+      "seed": 123456,
+      "ref_image_size": "最大2048（身份优先）",
+      "face_anchor": false,
+      "source_reference_scale": 1.0,
+      "audio_reuse": true,
+      "resume_completed": true,
+      "live_preview": true,
+      "preview_every_steps": 2,
+      "preview_resolution": 512,
+      "job_bundle": [
+        "3",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "CSR ③ 逐段替换 · 自动保存 · 断点续跑 · 实时预览"
+    }
+  },
+  "5": {
+    "class_type": "CSRSecondPass",
+    "inputs": {
+      "enable_second_pass": false,
+      "second_pass_model": "沿用一采模型",
+      "second_pass_lora": "none",
+      "second_pass_lora_strength": 1.0,
+      "latent_upscale_model": "minimax_h3_latent_upscaler_3d_fp16_V2.safetensors",
+      "upscale_scale": 1.5,
+      "upscale_device": "cuda",
+      "upscale_precision": "fp16",
+      "upscale_chunking": true,
+      "steps": 4,
+      "sampler_name": "er_sde",
+      "scheduler": "beta",
+      "denoise": 0.3,
+      "seed": 888888,
+      "resume_completed": true,
+      "live_preview": true,
+      "preview_every_steps": 1,
+      "preview_resolution": 512,
+      "rendered_segments": [
+        "4",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "CSR ③B 二采放大 · 可选 · 断点续跑"
+    }
+  },
+  "6": {
+    "class_type": "CSRMerge",
+    "inputs": {
+      "keep_original_audio": true,
+      "verify_boundaries": true,
+      "seam_exposure_lock": true,
+      "rendered_segments": [
+        "5",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "CSR ④ 无缝合并 · 后置封装音轨"
+    }
+  },
+  "7": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "filename_prefix": "video/AICG3D-CSR_视频裁剪_资源库_单线",
+      "format": "mp4",
+      "format.codec": "auto",
+      "codec": "auto",
+      "video": [
+        "6",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "保存最终成片"
+    }
+  }
+}

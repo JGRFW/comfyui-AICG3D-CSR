@@ -1,0 +1,523 @@
+{
+  "last_node_id": 8,
+  "last_link_id": 6,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "CSRModelLoader",
+      "title": "MiniMax H3 Aicg 加载器 · CSR独立版",
+      "pos": [
+        -1540,
+        -520
+      ],
+      "size": [
+        500,
+        760
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "model_bundle",
+          "type": "CSR_MODEL_BUNDLE",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CSRModelLoader"
+      },
+      "widgets_values": [
+        "MiniMax\\DasiwaMinimaxH3_dasiwaREF2VAHybridV1_0.safetensors",
+        "MiniMax\\DasiwaMinimaxH3_dasiwaREF2VAHybridV1_0.safetensors",
+        "Ref2VA（推荐）",
+        "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "minimax_h3_video_vae_int8_convrot.safetensors",
+        "minimax_h3_audio_vae_fp32.safetensors",
+        "ComfyUI 默认",
+        "minimax\\minimax_h3_turbo_v4_step600_ema_DasiwaREF2VAHybridV1_0_curveproj1025_compat_v001.safetensors",
+        1.0,
+        "minimax\\h3_character_swap_pro4500_1000.safetensors",
+        1.0,
+        "none",
+        1.0,
+        "none",
+        1.0,
+        "none",
+        1.0,
+        "none",
+        1.0,
+        "none",
+        1.0,
+        "none",
+        1.0
+      ],
+      "widgets_values_named": {
+        "fl2va_model": "MiniMax\\DasiwaMinimaxH3_dasiwaREF2VAHybridV1_0.safetensors",
+        "ref2va_model": "MiniMax\\DasiwaMinimaxH3_dasiwaREF2VAHybridV1_0.safetensors",
+        "task_mode": "Ref2VA（推荐）",
+        "text_encoder": "qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors",
+        "video_vae": "minimax_h3_video_vae_int8_convrot.safetensors",
+        "audio_vae": "minimax_h3_audio_vae_fp32.safetensors",
+        "attention_mode": "ComfyUI 默认",
+        "lora_1": "minimax\\minimax_h3_turbo_v4_step600_ema_DasiwaREF2VAHybridV1_0_curveproj1025_compat_v001.safetensors",
+        "lora_1_strength": 1.0,
+        "lora_2": "minimax\\h3_character_swap_pro4500_1000.safetensors",
+        "lora_2_strength": 1.0,
+        "lora_3": "none",
+        "lora_3_strength": 1.0,
+        "lora_4": "none",
+        "lora_4_strength": 1.0,
+        "lora_5": "none",
+        "lora_5_strength": 1.0,
+        "lora_6": "none",
+        "lora_6_strength": 1.0,
+        "lora_7": "none",
+        "lora_7_strength": 1.0,
+        "lora_8": "none",
+        "lora_8_strength": 1.0
+      },
+      "color": "#e3ecf8",
+      "bgcolor": "#f4f7fc"
+    },
+    {
+      "id": 2,
+      "type": "CSRVideoCrop",
+      "title": "MiniMax H3 Aicg 视频裁剪 · CSR独立版",
+      "pos": [
+        -940,
+        -520
+      ],
+      "size": [
+        540,
+        660
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model_bundle",
+          "type": "CSR_MODEL_BUNDLE",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video_bundle",
+          "type": "CSR_VIDEO_BUNDLE",
+          "links": [
+            2
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CSRVideoCrop"
+      },
+      "widgets_values": [
+        "{}",
+        "[{\"start\": 0, \"end\": 10.0}]",
+        480,
+        "540P",
+        0,
+        0,
+        22,
+        3,
+        "libx264（CPU·稳定）",
+        0.0,
+        "16:9"
+      ],
+      "widgets_values_named": {
+        "video_state": "{}",
+        "segment_ranges": "[{\"start\": 0, \"end\": 10.0}]",
+        "short_edge": 480,
+        "resolution_preset": "540P",
+        "custom_width": 0,
+        "custom_height": 0,
+        "context_frames": 22,
+        "seam_blend_frames": 3,
+        "encoder": "libx264（CPU·稳定）",
+        "test_seconds": 0.0,
+        "aspect_ratio": "16:9"
+      },
+      "color": "#e3ecf8",
+      "bgcolor": "#f4f7fc"
+    },
+    {
+      "id": 3,
+      "type": "CSRMediaAssets",
+      "title": "MiniMax H3 Aicg资源库 · CSR独立版",
+      "pos": [
+        -300,
+        -520
+      ],
+      "size": [
+        540,
+        500
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video_bundle",
+          "type": "CSR_VIDEO_BUNDLE",
+          "link": 2
+        }
+      ],
+      "outputs": [
+        {
+          "name": "job_bundle",
+          "type": "CSR_JOB_BUNDLE",
+          "links": [
+            3
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CSRMediaAssets"
+      },
+      "widgets_values": [
+        "{}",
+        "the target person or object corresponding to replacement reference 1 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 2 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 3 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 4 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 5 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 6 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 7 in the first frame; track this same target thereafter and do not substitute unrelated content"
+      ],
+      "widgets_values_named": {
+        "asset_state": "{}",
+        "character_bindings": "the target person or object corresponding to replacement reference 1 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 2 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 3 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 4 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 5 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 6 in the first frame; track this same target thereafter and do not substitute unrelated content\nthe target person or object corresponding to replacement reference 7 in the first frame; track this same target thereafter and do not substitute unrelated content"
+      },
+      "color": "#e3ecf8",
+      "bgcolor": "#f4f7fc"
+    },
+    {
+      "id": 4,
+      "type": "CSRSegmentReplace",
+      "title": "CSR ③ 逐段替换 · 自动保存 · 断点续跑 · 实时预览",
+      "pos": [
+        330,
+        -520
+      ],
+      "size": [
+        540,
+        900
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "job_bundle",
+          "type": "CSR_JOB_BUNDLE",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "rendered_segments",
+          "type": "CSR_RENDERED_SEGMENTS",
+          "links": [
+            4
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CSRSegmentReplace"
+      },
+      "widgets_values": [
+        "把画面中的目标人物替换为上传人物参考图（若上传背景图则同时替换环境）；保留原视频的镜头、身体动作、口型、人物站位与互动节奏，不增加原视频没有的动作。",
+        "自定义",
+        8,
+        "er_sde",
+        "beta",
+        123456,
+        "fixed",
+        "最大2048（身份优先）",
+        false,
+        1.0,
+        true,
+        true,
+        true,
+        2,
+        512
+      ],
+      "widgets_values_named": {
+        "description": "把画面中的目标人物替换为上传人物参考图（若上传背景图则同时替换环境）；保留原视频的镜头、身体动作、口型、人物站位与互动节奏，不增加原视频没有的动作。",
+        "replacement_tags": "自定义",
+        "steps": 8,
+        "sampler_name": "er_sde",
+        "scheduler": "beta",
+        "seed": 123456,
+        "ref_image_size": "最大2048（身份优先）",
+        "face_anchor": false,
+        "source_reference_scale": 1.0,
+        "audio_reuse": true,
+        "resume_completed": true,
+        "live_preview": true,
+        "preview_every_steps": 2,
+        "preview_resolution": 512
+      },
+      "color": "#e3ecf8",
+      "bgcolor": "#f4f7fc"
+    },
+    {
+      "id": 5,
+      "type": "CSRSecondPass",
+      "title": "CSR ③B 二采放大 · 可选 · 断点续跑",
+      "pos": [
+        930,
+        -520
+      ],
+      "size": [
+        540,
+        180
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "rendered_segments",
+          "type": "CSR_RENDERED_SEGMENTS",
+          "link": 4
+        }
+      ],
+      "outputs": [
+        {
+          "name": "rendered_segments",
+          "type": "CSR_RENDERED_SEGMENTS",
+          "links": [
+            5
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CSRSecondPass"
+      },
+      "widgets_values": [
+        false,
+        "沿用一采模型",
+        "none",
+        1.0,
+        "minimax_h3_latent_upscaler_3d_fp16_V2.safetensors",
+        1.5,
+        "cuda",
+        "fp16",
+        true,
+        4,
+        "er_sde",
+        "beta",
+        0.3,
+        888888,
+        "fixed",
+        true,
+        true,
+        1,
+        512
+      ],
+      "widgets_values_named": {
+        "enable_second_pass": false,
+        "second_pass_model": "沿用一采模型",
+        "second_pass_lora": "none",
+        "second_pass_lora_strength": 1.0,
+        "latent_upscale_model": "minimax_h3_latent_upscaler_3d_fp16_V2.safetensors",
+        "upscale_scale": 1.5,
+        "upscale_device": "cuda",
+        "upscale_precision": "fp16",
+        "upscale_chunking": true,
+        "steps": 4,
+        "sampler_name": "er_sde",
+        "scheduler": "beta",
+        "denoise": 0.3,
+        "seed": 888888,
+        "resume_completed": true,
+        "live_preview": true,
+        "preview_every_steps": 1,
+        "preview_resolution": 512
+      },
+      "color": "#e3ecf8",
+      "bgcolor": "#f4f7fc"
+    },
+    {
+      "id": 6,
+      "type": "CSRMerge",
+      "title": "CSR ④ 无缝合并 · 后置封装音轨",
+      "pos": [
+        1560,
+        -520
+      ],
+      "size": [
+        470,
+        250
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "rendered_segments",
+          "type": "CSR_RENDERED_SEGMENTS",
+          "link": 5
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "links": [
+            6
+          ]
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "CSRMerge"
+      },
+      "widgets_values": [
+        true,
+        true,
+        true
+      ],
+      "widgets_values_named": {
+        "keep_original_audio": true,
+        "verify_boundaries": true,
+        "seam_exposure_lock": true
+      },
+      "color": "#e3ecf8",
+      "bgcolor": "#f4f7fc"
+    },
+    {
+      "id": 7,
+      "type": "SaveVideo",
+      "title": "保存最终成片",
+      "pos": [
+        2100,
+        -520
+      ],
+      "size": [
+        480,
+        450
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "link": 6
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "links": []
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SaveVideo"
+      },
+      "widgets_values": [
+        "video/AICG3D-CSR_视频裁剪_资源库_单线",
+        "mp4",
+        "auto",
+        "auto"
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "video/AICG3D-CSR_视频裁剪_资源库_单线",
+        "format": "mp4",
+        "format.codec": "auto",
+        "codec": "auto"
+      },
+      "color": "#e3ecf8",
+      "bgcolor": "#f4f7fc"
+    },
+    {
+      "id": 8,
+      "type": "Note",
+      "title": "使用说明",
+      "pos": [
+        -1220,
+        -1040
+      ],
+      "size": [
+        980,
+        480
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {},
+      "widgets_values": [
+        "AICG3D-CSR 双节点素材工作流\n\n这是一条完全独立的 CSR 单线节点链，不依赖原来的 comfyui-AICG3D 节点：\nMiniMax H3 Aicg 加载器 -> MiniMax H3 Aicg 视频裁剪 -> MiniMax H3 Aicg资源库 -> CSR ③ -> CSR ③B 二采（可选） -> CSR ④ -> 保存。\n\n1. 视频裁剪节点只负责源视频上传、音轨剥离、目标时长、滑块定位和自由分段。\n2. 资源库节点负责替换参考 1-9（人物或物品）、背景图和参考首帧；所有图片使用完整缩略图显示。\n3. 两个素材节点之间仍然只有一根视频任务包连线，整条链每个节点只保留一个输出口。\n4. CSR ③ 底部显示当前段、采样步数、剩余时间和实时画面；每段完成后直接播放该段 MP4。\n5. 音频在视频裁剪阶段自动剥离，不进入任何分段；CSR ④ 合并完成后才把 source_audio.wav 封装进去。\n6. CSR ③ 的“替换标签”可选择人物、背景、物品或组合场景，并一键应用对应提示词模板。\n7. CSR ③B 默认关闭并直接透传；打开后才展开二采模型、Latent 放大器、倍率、步数、采样器、调度器、denoise、seed 和断点续跑参数。\n8. CSR ④ 默认开启跨段曝光锁定，匹配相邻片段的亮度基线和段首低频光影；硬切镜头会自动跳过混合。\n\n推荐先用 480 短边和 8 步预览；复杂多人建议拆成多个 CSR ③ 节点顺序替换。\n"
+      ],
+      "color": "#fff0ca",
+      "bgcolor": "#fff8e6"
+    }
+  ],
+  "links": [
+    [
+      1,
+      1,
+      0,
+      2,
+      0,
+      "CSR_MODEL_BUNDLE"
+    ],
+    [
+      2,
+      2,
+      0,
+      3,
+      0,
+      "CSR_VIDEO_BUNDLE"
+    ],
+    [
+      3,
+      3,
+      0,
+      4,
+      0,
+      "CSR_JOB_BUNDLE"
+    ],
+    [
+      4,
+      4,
+      0,
+      5,
+      0,
+      "CSR_RENDERED_SEGMENTS"
+    ],
+    [
+      5,
+      5,
+      0,
+      6,
+      0,
+      "CSR_RENDERED_SEGMENTS"
+    ],
+    [
+      6,
+      6,
+      0,
+      7,
+      0,
+      "VIDEO"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.72,
+      "offset": [
+        1420,
+        860
+      ]
+    }
+  },
+  "version": 0.4
+}

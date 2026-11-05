@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.integration_test/
+.audio_test/
+.audio_plan_test/
+.server-test.*

@@ -35,7 +35,7 @@ const CSS = `
 .csr-ma-preview { height:112px; background:#0d1116; display:grid; place-items:center; color:#6f7d92; font-size:10px; cursor:pointer; }
 .csr-ma-preview img { width:100%; height:100%; object-fit:contain; display:block; }
 .csr-ma-binding { display:flex; flex-direction:column; gap:3px; font-size:10px; color:#96a5bb; }
-.csr-ma-binding textarea { width:100%; min-height:64px; resize:vertical; border:1px solid #3e4a5f; border-radius:6px; background:#151a21; color:#dce6f4; padding:6px; font-size:10px; }
+.csr-ma-binding textarea { width:100%; min-height:64px; box-sizing:border-box; resize:vertical; border:1px solid #3e4a5f; border-radius:6px; background:#151a21; color:#dce6f4; padding:6px; font-size:10px; }
 .csr-ma-status { min-height:15px; color:#8f9eb3; font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .csr-ma-status.error { color:#ff8f8f; }
 .csr-ma-status.warn { color:#e6c36c; }
@@ -93,6 +93,34 @@ function maxUploadedCharacter(node) {
   return highest;
 }
 
+function measuredContentHeight(root) {
+  if (!root) return 0;
+  const style = getComputedStyle(root);
+  const paddingBottom = Number.parseFloat(style.paddingBottom) || 0;
+  let bottom = 0;
+  for (const child of root.children) {
+    if (child.hidden || child.offsetHeight <= 0) continue;
+    bottom = Math.max(bottom, child.offsetTop + child.offsetHeight);
+  }
+  return Math.ceil(bottom + paddingBottom);
+}
+
+function scheduleSlotLayout(node) {
+  if (node._csrLayoutRaf) cancelAnimationFrame(node._csrLayoutRaf);
+  node._csrLayoutRaf = requestAnimationFrame(() => {
+    node._csrLayoutRaf = 0;
+    updateSlotLayout(node);
+  });
+}
+
+function settleSlotLayout(node) {
+  for (const delay of [0, 80, 250, 600]) {
+    setTimeout(() => {
+      if (node._csrRoot) updateSlotLayout(node);
+    }, delay);
+  }
+}
+
 function updateSlotLayout(node) {
   const visible = node._visibleCharacters || DEFAULT_VISIBLE_CHARACTERS;
   for (let index = 1; index <= MAX_CHARACTERS; index += 1) {
@@ -102,15 +130,11 @@ function updateSlotLayout(node) {
   if (node._slotCount) node._slotCount.textContent = `替换物 ${visible}/${MAX_CHARACTERS}`;
   if (node._slotMinus) node._slotMinus.disabled = visible <= MIN_CHARACTERS || Boolean(node._csrAssetState[`character_${visible}`]?.file);
   if (node._slotPlus) node._slotPlus.disabled = visible >= MAX_CHARACTERS;
-  const rows = Math.ceil((visible + 2) / 2);
-  const extra = Math.max(0, rows - 3) * 139;
-  const fallbackHeight = 430 + extra;
   const panel = node._csrPanelWidget;
   if (!panel) {
-    node.setSize?.([Math.max(540, node.size?.[0] || 540), 500 + extra]);
+    node.setSize?.([Math.max(540, node.size?.[0] || 540), measuredContentHeight(node._csrRoot) + 64]);
   } else {
-    const measured = Math.ceil(node._csrRoot?.scrollHeight || 0);
-    const panelHeight = Math.max(fallbackHeight, measured + 12);
+    const panelHeight = Math.max(280, measuredContentHeight(node._csrRoot));
     const heightGetter = () => panelHeight;
     panel.getMinHeight = heightGetter;
     panel.getMaxHeight = heightGetter;
@@ -238,6 +262,9 @@ function createPanel(node) {
     _csrStatus: status,
     _csrAssetStateWidget: widget(node, "asset_state"),
   });
+  node._csrBindingObserver = new ResizeObserver(() => scheduleSlotLayout(node));
+  node._csrBindingObserver.observe(bindingInput);
+  node._csrBindingObserver.observe(assets);
   node._csrAssetState = readState(node);
   node._visibleCharacters = Math.min(MAX_CHARACTERS, Math.max(DEFAULT_VISIBLE_CHARACTERS, maxUploadedCharacter(node)));
   hideWidget(node._csrAssetStateWidget);
@@ -305,10 +332,7 @@ function createPanel(node) {
     getMaxHeight: () => 4096,
   });
   renderAssets(node);
-  setTimeout(() => {
-    updateSlotLayout(node);
-    requestAnimationFrame(() => updateSlotLayout(node));
-  }, 0);
+  settleSlotLayout(node);
 }
 
 app.registerExtension({
@@ -330,8 +354,7 @@ app.registerExtension({
         this._csrAssetState = readState(this);
         this._visibleCharacters = Math.min(MAX_CHARACTERS, Math.max(DEFAULT_VISIBLE_CHARACTERS, maxUploadedCharacter(this)));
         renderAssets(this);
-        updateSlotLayout(this);
-        requestAnimationFrame(() => updateSlotLayout(this));
+        settleSlotLayout(this);
       }, 0);
       return result;
     };

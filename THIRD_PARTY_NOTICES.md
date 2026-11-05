@@ -51,5 +51,8 @@ SOFTWARE.
 - MiniMax H3 models, text encoders, VAEs, LoRAs, latent upscalers and face detectors are not bundled and are governed by their own licenses.
 - FFmpeg and FFprobe are not bundled. Users must comply with the license of the FFmpeg build they install or distribute.
 - Python packages such as `numpy` and `filelock` are installed separately and retain their own licenses.
+- Optional local vision inference uses the public `llama-cpp-python` chat-handler API. `llama-cpp-python` and its bundled native libraries are not included in this repository and retain their own licenses.
 
 This project is independent and is not affiliated with or endorsed by MiniMax, ComfyUI, Comfy Org, AICG3D, nkxx188, model or LoRA providers, or any referenced platform. Names and trademarks remain the property of their respective owners.
+
+The CSR prompt optimizer is an independent implementation. It does not import or copy the GPL prompt-optimizer implementation from `comfyui-AICG3D`; it communicates with user-selected local OpenAI-compatible endpoints or an optional local GGUF runtime through CSR's own routes.

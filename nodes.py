@@ -45,7 +45,7 @@ from .sequence_seam import export_with_seam_repair
 
 CATEGORY = "AICG3D-CSR/人物场景替换"
 LOG = logging.getLogger(__name__)
-VERSION = "2.1.0"
+VERSION = "2.2.0"
 
 TARGET_CHOICES = {
     "auto": "自动判断（推荐）",
@@ -59,6 +59,9 @@ REF_SIZE_CHOICES = {
 }
 REPLACEMENT_TAG_CHOICES = [
     "自定义",
+    "单人替换",
+    "多人替换",
+    "商品替换",
     "人物替换",
     "背景/场景替换",
     "物品/产品替换",
@@ -304,8 +307,9 @@ def references_prompt(references: dict, description: str, replacement_tags: str 
         )
         lines.append(
             f"<Picture {scene_index}> is the complete replacement environment, not a person. "
-            "Use its entire spatial layout, architecture, furniture, surfaces, colours and lighting. "
-            "Every original background region must be replaced, and no room structure from <Video 1> may remain. "
+            "It is the mandatory and sole source for the environment, not a style, colour or relighting reference. "
+            "Cover every background pixel outside retained foreground subjects with its complete spatial layout, architecture, furniture, surfaces, colours and lighting. "
+            "Delete all walls, floors, ceilings, windows, furniture, decor, room layout, materials and lighting patterns from <Video 1>; do not recolour, blur, partially retouch or blend the old scene. "
             f"Do not bring any person from <Picture {scene_index}> into the result."
         )
     if master_picture:
@@ -361,7 +365,8 @@ def references_prompt(references: dict, description: str, replacement_tags: str 
         lines.append(
             f"{scene_subject}: attribute_transfer - its entire architecture, room layout, furniture, surfaces, "
             "colours and lighting replace every background region while camera motion follows <Video 1>. "
-            "The original walls, floor, ceiling, furniture, décor and room structure are removed, not merely recoloured."
+            "This replacement is compulsory: the original walls, floor, ceiling, furniture, décor and room structure are removed, not merely recoloured. "
+            "Foreground identities, wardrobe, occlusion, contact shadows, motion, framing and timing remain unchanged."
         )
     if master_picture:
         lines.append(

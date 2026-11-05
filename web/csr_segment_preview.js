@@ -1,5 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
+import { createPromptOptimizer } from "./csr_prompt_optimizer.js";
+import { FALLBACK_SKILLS, loadReplacementSkills, skillTemplateMap } from "./csr_replacement_skills.js";
 
 const NODE_NAME = "CSRSegmentReplace";
 const EVENT = "aicg3d_csr_progress";
@@ -48,15 +50,33 @@ function el(tag, className, text) {
 
 const TAG_TEMPLATES = {
   "人物替换": "仅替换视频中的目标人物。人物身份、脸型、五官、发型、身体比例和服装严格来自对应人物参考图；保持原视频的背景、镜头运动、人物站位、身体动作、口型、互动节奏、光线和时长不变。不增加原视频没有的人物或动作。",
-  "背景/场景替换": "仅替换视频中的背景和环境，所有人物保持不变。背景整体替换为背景参考图中的完整环境，继承空间结构、墙面、地面、家具、陈设、材质、颜色和光照；删除原视频旧背景，不把背景参考中的人物、文字或水印带入成片。保持人物身份、服装、动作、站位、镜头和时长不变。",
+  "背景/场景替换": "执行强制背景/场景替换，所有人物和指定保留物品保持不变。背景参考图是唯一环境来源，不是风格、颜色或光照参考。覆盖除前景人物和指定物品外的全部背景区域，完整继承参考图中的空间结构、墙体、地面、天花、门窗、家具、陈设、材质、颜色和光照。必须彻底删除原视频旧场景，不得保留旧房间布局、墙纸、家具轮廓或通过调色、模糊、局部修补伪装成新背景。新场景从画面四边到人物边缘连续铺满，人物头发、透明衣物、遮挡、脚底接触和接触阴影自然；不把参考图中的人物、文字、LOGO或水印带入成片。保持人物身份、服装、动作、口型、站位、镜头和时长不变。",
   "物品/产品替换": "仅替换视频中指定的物品或产品，人物保持不变。物品的轮廓、比例、颜色、材质、结构、LOGO 和细节严格来自对应物品参考图；保持原人物身份、脸部、发型、服装、手部姿势、动作、镜头、背景和时长不变。物品必须自然贴合原握持位置、遮挡关系和接触阴影，避免漂浮、穿模、变形和闪烁。",
-  "人物 + 背景": "同时替换人物和背景。人物身份、脸型、发型、身体比例和服装来自对应人物参考图；背景整体替换为背景参考图中的完整环境，包括空间结构、家具、材质、颜色和光照。保持原视频镜头、人物站位、动作、口型、互动节奏和时长不变。人物与新背景的透视、比例、光照和接触阴影自然一致，不引入背景参考中的人物、文字、水印或边框。",
+  "人物 + 背景": "同时强制替换指定人物和完整背景。人物身份、脸型、发型、身体比例和服装严格来自对应人物参考图；背景参考图作为唯一环境来源，覆盖除保留前景之外的全部背景区域，完整重建空间结构、墙体、地面、天花、门窗、家具、陈设、材质、颜色和光照。必须清除原视频旧场景结构，不能只改变颜色、光线或局部材质。保持原视频镜头、人物站位、动作、口型、互动节奏和时长不变。人物与新背景的透视、比例、光照、边缘和接触阴影自然一致，不引入背景参考中的人物、文字、LOGO、水印或边框。",
   "人物 + 物品": "同时替换人物和指定物品/产品。人物外观严格来自人物参考图，物品轮廓、比例、颜色、材质、结构和 LOGO 严格来自物品参考图。保持原视频背景、镜头、人物动作、手部姿势、口型、站位和时长不变。物品必须自然贴合手部握持、遮挡和接触阴影，不改变未被指定替换的内容。",
   "人物 + 背景 + 物品": "同时替换人物、背景和指定物品/产品。人物身份与服装来自人物参考图，环境来自背景参考图，物品外观与材质来自物品参考图。保持原视频镜头、动作、口型、站位、互动节奏和时长不变。人物与新背景的透视、光照和接触阴影自然一致，物品自然贴合手部姿势和遮挡关系，不引入参考图中无关的人物、文字、水印或物体。",
 };
 
 function widget(node, name) {
   return node.widgets?.find((item) => item.name === name);
+}
+
+function renderTagOptions(select, skills, selected = "自定义") {
+  select.replaceChildren(new Option("自定义", "自定义"));
+  const skillTags = new Set((skills || []).map((item) => item.tag));
+  const skillGroup = document.createElement("optgroup");
+  skillGroup.label = "常用替换技能";
+  for (const skill of skills || []) skillGroup.append(new Option(skill.label, skill.tag));
+  if (skillGroup.children.length) select.append(skillGroup);
+  const legacy = Object.keys(TAG_TEMPLATES).filter((tag) => !skillTags.has(tag));
+  if (legacy.length) {
+    const legacyGroup = document.createElement("optgroup");
+    legacyGroup.label = "组合与兼容标签";
+    for (const tag of legacy) legacyGroup.append(new Option(tag, tag));
+    select.append(legacyGroup);
+  }
+  if (selected && ![...select.options].some((item) => item.value === selected)) select.append(new Option(selected, selected));
+  select.value = selected || "自定义";
 }
 
 function setWidgetValue(node, name, value) {
@@ -175,11 +195,20 @@ function createPanel(node) {
   const tagRow = el("div", "csr-tag-row");
   tagRow.append(el("label", "", "替换标签"));
   const tagSelect = el("select");
-  for (const tag of ["自定义", ...Object.keys(TAG_TEMPLATES)]) tagSelect.append(new Option(tag, tag));
+  node._csrReplacementSkills = [...FALLBACK_SKILLS];
+  node._csrSkillTemplates = skillTemplateMap(node._csrReplacementSkills);
+  renderTagOptions(tagSelect, node._csrReplacementSkills, String(tagWidget?.value || "自定义"));
   tagSelect.value = String(tagWidget?.value || "自定义");
+  loadReplacementSkills(api).then((skills) => {
+    node._csrReplacementSkills = skills;
+    node._csrSkillTemplates = { ...TAG_TEMPLATES, ...skillTemplateMap(skills) };
+    renderTagOptions(tagSelect, skills, tagSelect.value);
+    if (node._csrLive) node._csrLive.skillSelectReady = true;
+  });
   const applyTag = el("button", "", "应用模板");
   applyTag.type = "button";
-  tagRow.append(tagSelect, applyTag);
+  const optimizerButton = createPromptOptimizer(node, tagSelect);
+  tagRow.append(tagSelect, applyTag, optimizerButton);
   const syncTag = () => {
     const value = String(widget(node, "replacement_tags")?.value || "自定义");
     if (![...tagSelect.options].some((item) => item.value === value)) tagSelect.append(new Option(value, value));
@@ -188,7 +217,7 @@ function createPanel(node) {
   applyTag.onclick = (event) => {
     event.stopPropagation();
     setWidgetValue(node, "replacement_tags", tagSelect.value);
-    const template = TAG_TEMPLATES[tagSelect.value];
+    const template = node._csrSkillTemplates?.[tagSelect.value] || TAG_TEMPLATES[tagSelect.value];
     if (template) setWidgetValue(node, "description", template);
   };
   tagSelect.onchange = () => setWidgetValue(node, "replacement_tags", tagSelect.value);

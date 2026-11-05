@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.2.0
+
+### Optional Prompt Vision
+
+- Prompt optimization remains text-only and never reads media unless the user enables vision analysis.
+- Added API vision-model selection and local GGUF `mmproj` selection.
+- Visual requests sample up to three target-segment frames and three high-priority references, capped at six 512px JPEG images.
+- Media paths are restricted to ComfyUI `input`, `output` and `temp` roots.
+- Added Qwen2.5-VL, Qwen3-VL, Qwen3.5 and Qwen3.8 GGUF handler routing.
+
+### Installation Documentation
+
+- Added a prominent FFmpeg/ffprobe prerequisite and cross-platform troubleshooting guide.
+- Documented that `imageio-ffmpeg` cannot replace the separate `ffprobe` executable and that ComfyUI must be fully restarted after changing `PATH`.
+- Expanded GitHub documentation for the prompt optimizer, optional vision models, model directories, privacy and VRAM handling.
+
 ## 2.1.0
 
 ### 工作流与稳定性
@@ -26,6 +42,14 @@
 - 加上背景和参考帧仍保持 H3 的九图参考上限。
 - 移除节点底部“背景替换已启用”提示。
 - 图片缩略图完整显示。
+
+### Prompt Skills and Local Optimizer
+
+- Added first-class skills for single-person, multi-person, product and background/scene replacement.
+- Added a local prompt optimizer with OpenAI-compatible API support and optional GGUF loading.
+- Added strict background-repair and foreground-preserve schemes.
+- Added independent skills JSON loading and grouped convenience tags in `CSR ③`.
+- Hardened scene replacement instructions to remove old environment structure instead of recoloring it.
 
 ### 接缝与输出
 

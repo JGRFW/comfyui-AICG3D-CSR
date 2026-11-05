@@ -18,7 +18,7 @@ class PublicPackageTests(unittest.TestCase):
         project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         dependencies = "\n".join(project["project"]["dependencies"])
         requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8")
-        for package in ("filelock", "numpy"):
+        for package in ("Pillow", "filelock", "numpy"):
             self.assertIn(package, dependencies)
             self.assertIn(package, requirements)
 
@@ -50,7 +50,14 @@ class PublicPackageTests(unittest.TestCase):
 
         routes = (ROOT / "routes.py").read_text(encoding="utf-8")
         declared = re.findall(r'routes\.(?:get|post|put|delete)\("([^"]+)"', routes)
-        self.assertEqual(declared, ["/aicg3d_csr/video_info"])
+        self.assertEqual(declared, [
+            "/aicg3d_csr/replacement_skills",
+            "/aicg3d_csr/prompt_optimizer/config",
+            "/aicg3d_csr/prompt_optimizer/config",
+            "/aicg3d_csr/prompt_optimizer/models",
+            "/aicg3d_csr/prompt_optimizer/optimize",
+            "/aicg3d_csr/video_info",
+        ])
 
     def test_packaged_files_do_not_embed_local_absolute_paths(self):
         suffixes = {".py", ".js", ".json", ".md", ".toml", ".txt"}
@@ -86,6 +93,9 @@ class PublicPackageTests(unittest.TestCase):
     def test_media_assets_defaults_to_four_visible_cards_and_seven_slots(self):
         script = (WEB / "csr_media_assets.js").read_text(encoding="utf-8")
         self.assertIn("node.setSize?.([nodeWidth, panelHeight + 64]);", script)
+        self.assertIn("function measuredContentHeight(root)", script)
+        self.assertIn("new ResizeObserver(() => scheduleSlotLayout(node))", script)
+        self.assertNotIn("Math.ceil(node._csrRoot?.scrollHeight", script)
         self.assertIn("const DEFAULT_VISIBLE_CHARACTERS = 2;", script)
         self.assertIn("const MAX_CHARACTERS = 7;", script)
         self.assertNotIn("character_8", script)
@@ -104,6 +114,39 @@ class PublicPackageTests(unittest.TestCase):
             self.assertIn(phrase, legal)
         notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
         self.assertIn("Permission is hereby granted", notices)
+
+    def test_installation_docs_cover_ffmpeg_ffprobe_and_prompt_optimizer(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        install = (ROOT / "docs" / "install-and-troubleshooting.md").read_text(encoding="utf-8")
+        optimizer = (ROOT / "docs" / "prompt-optimizer.md").read_text(encoding="utf-8")
+        backend = (ROOT / "media.py").read_text(encoding="utf-8")
+        for phrase in ("where.exe ffmpeg", "where.exe ffprobe", "ffmpeg -version", "ffprobe -version"):
+            self.assertIn(phrase, readme)
+            self.assertIn(phrase, install)
+        for phrase in ("完全退出", "imageio-ffmpeg", "同一个 FFmpeg", "提示词优化器", "mmproj"):
+            self.assertIn(phrase, install)
+        self.assertIn("视觉分析", optimizer)
+        self.assertIn("llama-cpp-python", optimizer)
+        self.assertIn("install-and-troubleshooting.md", backend)
+
+    def test_prompt_optimizer_is_independent_and_supports_local_models(self):
+        frontend = (WEB / "csr_prompt_optimizer.js").read_text(encoding="utf-8")
+        backend = (ROOT / "prompt_optimizer.py").read_text(encoding="utf-8")
+        segment = (WEB / "csr_segment_preview.js").read_text(encoding="utf-8")
+        self.assertIn("/aicg3d_csr/prompt_optimizer/optimize", frontend)
+        self.assertIn("OpenAI 兼容 API", backend)
+        self.assertIn("llama_cpp", backend)
+        self.assertIn("vision_enabled", backend)
+        self.assertIn("image_url", backend)
+        self.assertIn("mmproj_files", backend)
+        self.assertIn("启用视觉分析", frontend)
+        self.assertIn("视觉模型", frontend)
+        self.assertIn("background_repair", backend)
+        self.assertIn("createPromptOptimizer", segment)
+        self.assertIn("loadReplacementSkills", segment)
+        skills = json.loads((ROOT / "skills" / "replacement_skills.json").read_text(encoding="utf-8"))
+        self.assertEqual({item["tag"] for item in skills["skills"]}, {"单人替换", "多人替换", "商品替换", "背景/场景替换"})
+        self.assertIn("强制背景/场景替换", segment)
 
     def test_video_crop_resolution_uses_horizontal_resolution_and_aspect_controls(self):
         script = (WEB / "csr_video_crop.js").read_text(encoding="utf-8")

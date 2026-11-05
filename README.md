@@ -12,6 +12,8 @@
 - **音频完全独立**：源视频上传后先剥离完整音轨，所有生成分段保持静音，最终视频完成后再封装音频。
 - **接缝处理针对生成问题**：跨段曝光锁定、段首低频光影匹配、加性亮度过渡、同镜头运动桥接和硬切保护，不是简单交叉淡化。
 - **二采按需开启**：默认直接透传；需要时展开 3D Latent 放大、模型、LoRA、采样器、步数、denoise 和独立断点续跑。
+- **本地提示词优化**：在 `CSR ③` 内接入 Ollama、LM Studio、llama.cpp 等 OpenAI 兼容 API，也可选本地 GGUF，并提供背景强制替换与失败修复方案。
+- **视觉分析可选**：默认只发送文字；主动开启后可读取目标段首/中/尾帧与少量参考图，API 可单独选择视觉模型，本地 GGUF 可选配套 `mmproj`。
 - **分辨率真正可控**：支持 360P、480P、540P、720P、1080P 和自定义尺寸，并实时显示最终模型画布。
 - **素材库默认更轻**：默认显示两个替换物、背景和参考帧四张卡，最多扩展到七个替换物，全部图片参考控制在 H3 的九图上限内。
 - **开源兼容边界清楚**：节点、前端扩展和路由使用独立命名空间，不全局修改 ComfyUI 采样器、注意力后端或画布行为。
@@ -21,12 +23,32 @@
 ## 功能详解
 
 - 中文完整功能、技术细节、适用场景和能力边界：[docs/features.zh-CN.md](docs/features.zh-CN.md)
+- 安装、FFmpeg/ffprobe 与故障排查：[docs/install-and-troubleshooting.md](docs/install-and-troubleshooting.md)
+- 四大专用替换 Skill：[skills/README.md](skills/README.md)
 - 替换提示词模板：[docs/replacement-prompts.md](docs/replacement-prompts.md)
+- 本地提示词优化器：[docs/prompt-optimizer.md](docs/prompt-optimizer.md)
 - 法律声明与可接受使用：[LEGAL.md](LEGAL.md)
 - 隐私说明：[PRIVACY.md](PRIVACY.md)
 - 安全策略：[SECURITY.md](SECURITY.md)
 - 第三方代码与模型声明：[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 - MIT 许可证：[LICENSE](LICENSE)
+
+## 安装前必看：FFmpeg 与 ffprobe
+
+如果 `MiniMax H3 Aicg 视频裁剪 · CSR独立版` 提示“需要与 FFmpeg 配套的 ffprobe，请把二者加入 PATH”，请先确认系统同时提供 `ffmpeg` 和 `ffprobe`，且二者来自同一个 FFmpeg 构建的 `bin` 目录。
+
+```powershell
+where.exe ffmpeg
+where.exe ffprobe
+ffmpeg -version
+ffprobe -version
+```
+
+四条命令都必须成功。修改 `PATH` 后必须完全退出并重新启动 ComfyUI，正在运行的旧进程不会自动读取新的环境变量。`imageio-ffmpeg` 不能替代独立的 ffprobe。Windows、macOS、Linux、Docker 安装步骤和提示词优化配置请看：[安装与故障排查](docs/install-and-troubleshooting.md)。
+
+## 提示词优化器
+
+`CSR ③` 的“提示词优化”支持 Ollama、LM Studio、llama.cpp server 等 OpenAI 兼容 API，也支持可选 `llama-cpp-python` 本地 GGUF。视觉分析默认关闭，未选择 API 视觉模型或本地 `mmproj` 时只处理文字，不读取素材。详细配置、模型目录、隐私边界和视觉模型说明见 [docs/prompt-optimizer.md](docs/prompt-optimizer.md)。
 
 ## 重要使用边界
 
@@ -52,7 +74,18 @@ Background replacement is bound directly to its uploaded `<Picture N>` instead o
 
 If `参考/首帧` is also uploaded, it is automatically ignored as an environment lock and first-frame guide while a replacement background is present, because the old frame would otherwise force the original scene back into the result.
 
+## FFmpeg and ffprobe
+
+This plugin requires both `ffmpeg` and `ffprobe`. Install them from the same complete FFmpeg build, add that build's `bin` directory to `PATH`, open a new terminal, and verify `ffmpeg -version` and `ffprobe -version` before restarting ComfyUI. `imageio-ffmpeg` does not provide a separate `ffprobe`. Full instructions: [Install and troubleshooting](docs/install-and-troubleshooting.md).
+
+## Prompt Optimizer
+
+The prompt optimizer inside `CSR ③` supports local OpenAI-compatible APIs and optional local GGUF models through `llama-cpp-python`. Vision analysis is opt-in and remains text-only unless a vision model or matching `mmproj` is selected. See [docs/prompt-optimizer.md](docs/prompt-optimizer.md) for API setup, model directories, visual-model behavior, VRAM handling and privacy boundaries.
+
 ## Replacement Prompt Tags
+
+The prompt optimizer has an opt-in vision mode. It stays off by default, so the optimizer sends text only and never reads uploaded media. When enabled, CSR samples up to three low-resolution frames from the current target segment and up to three resource-library images, validates every path against ComfyUI's `input`, `output` and `temp` roots, and sends at most six compressed images. API mode accepts a separate vision model ID; local GGUF mode requires a matching `mmproj` projector.
+
 
 `CSR ③` includes a replacement-tag menu for person, scene/background, object/product, and their combinations. Selecting a tag only records the task category; clicking `应用模板` writes that tag's full prompt into the existing `description` field. This prevents accidental loss of a hand-edited prompt when switching tags.
 
@@ -141,17 +174,33 @@ The merge node enables `跨段曝光锁定` by default. This is not a cross-fade
 
 ## Installation
 
-Requirements: Python 3.10 or newer, a ComfyUI build that provides MiniMax H3 core nodes, and the core `SaveVideo` node. The plugin imports only ComfyUI core modules; it does not import or depend on `comfyui-AICG3D` or any third-party attention-patch plugin.
+Requirements: Python 3.10 or newer, a ComfyUI build that provides MiniMax H3 core nodes, the core `SaveVideo` node, and a complete FFmpeg build containing both `ffmpeg` and `ffprobe`. The plugin imports only ComfyUI core modules; it does not import or depend on `comfyui-AICG3D` or any third-party attention-patch plugin.
 
-1. Copy or link this folder into `ComfyUI/custom_nodes/comfyui-AICG3D-CSR`.
+1. Copy or link this folder into `ComfyUI/custom_nodes/comfyui-AICG3D-CSR`, or clone it from the repository root:
+
+```powershell
+cd ComfyUI\custom_nodes
+git clone https://github.com/JGRFW/comfyui-AICG3D-CSR.git
+```
+
 2. Install requirements in the ComfyUI Python environment:
 
 ```powershell
 python -m pip install -r requirements.txt
 ```
 
-3. Make sure `ffmpeg` and `ffprobe` are available in `PATH`. The node also supports the FFmpeg binary supplied by `imageio-ffmpeg`, but `ffprobe` still has to be available.
-4. Restart ComfyUI and load:
+3. Install a complete FFmpeg build and add its `bin` directory to the system `PATH`. Both binaries must work from a newly opened terminal:
+
+```powershell
+where.exe ffmpeg
+where.exe ffprobe
+ffmpeg -version
+ffprobe -version
+```
+
+`imageio-ffmpeg` may supply the ffmpeg executable, but it cannot replace the separate `ffprobe` requirement. See [Install and troubleshooting](docs/install-and-troubleshooting.md) for Windows, macOS, Linux and Docker instructions.
+
+4. Fully quit and restart ComfyUI. Existing processes do not automatically receive newly added `PATH` entries. Then load:
 
 ```text
 workflows/AICG3D-CSR_视频裁剪_资源库_单线.json
@@ -224,11 +273,11 @@ The resource library exposes two replacement-object slots by default and can exp
 
 - Every public node class starts with `CSR`; no class name is shared with the original AICG3D plugin.
 - All frontend extensions use the `AICG3D.CSR.*` namespace and only wrap the lifecycle methods of their own node types.
-- The only HTTP route is `/aicg3d_csr/video_info`.
+- Every HTTP route uses the `/aicg3d_csr/` namespace; the video-info and prompt-optimizer routes do not reuse the original AICG3D endpoints.
 - Uploaded media paths are restricted to ComfyUI `input`, `output`, and `temp` directories.
 - No global ComfyUI node, sampler, attention backend, or canvas behavior is patched.
 - Legacy canvas mode and Nodes 2.0 both receive the measured DOM-widget height. The resource library and video-crop nodes no longer leak content outside their node bodies when Nodes 2.0 is disabled.
-- `numpy` and `filelock` are declared consistently in `pyproject.toml` and `requirements.txt`.
+- `Pillow`, `numpy` and `filelock` are declared consistently in `pyproject.toml` and `requirements.txt`.
 - The optional 3D latent upscaler helper is bundled from the MIT-licensed MiniMax H3 Easy project, with attribution in `THIRD_PARTY_NOTICES.md`.
 
 ## Outputs

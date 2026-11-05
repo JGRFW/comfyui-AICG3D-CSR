@@ -39,7 +39,8 @@ def ffmpeg_path() -> str:
         return imageio_ffmpeg.get_ffmpeg_exe()
     except ImportError as exc:
         raise VideoError(
-            "需要 FFmpeg。请把 ffmpeg/ffprobe 加入 PATH，或在 ComfyUI 环境安装 imageio-ffmpeg。"
+            "需要 FFmpeg 与配套 ffprobe。请把同一个 FFmpeg 构建的 bin 目录加入系统 PATH，"
+            "完全退出并重启 ComfyUI 后，在终端分别运行 ffmpeg -version 和 ffprobe -version 检查。"
         ) from exc
 
 
@@ -54,7 +55,10 @@ def ffprobe_path() -> str:
     for candidate in candidates:
         if candidate.is_file():
             return str(candidate)
-    raise VideoError("需要与 FFmpeg 配套的 ffprobe，请把二者加入 PATH。")
+    raise VideoError(
+        "需要与 FFmpeg 配套的 ffprobe。请确认 ffprobe 位于同一个 FFmpeg 构建的 bin 目录并已加入系统 PATH；"
+        "完全退出并重启 ComfyUI 后运行 ffprobe -version 验证。详见 docs/install-and-troubleshooting.md。"
+    )
 
 
 def run(command: list[str], *, check: bool = True) -> subprocess.CompletedProcess:

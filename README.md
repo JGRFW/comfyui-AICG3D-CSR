@@ -1,12 +1,9 @@
+<img width="1768" height="843" alt="屏幕截图 2026-11-05 125824" src="https://github.com/user-attachments/assets/5832ea62-6063-45ca-a0eb-7b7bbb473cb8" />
 # comfyui-AICG3D-CSR
 
 > 一条线，把裁切、分段、替换、断点续跑、二采、音轨后封装和接缝修复，组织成可恢复的视频生产流水线。
 
 `comfyui-AICG3D-CSR` 是面向 ComfyUI 与 MiniMax H3 的独立人物、场景、物品和产品替换节点包。它把长视频替换里最容易断裂的环节连成一条单线工作流，并让每一段生成结果都能立即保存、检查和续跑。
-
-![资源库四卡槽](docs/media-assets-4cards-v220.png)
-
-![视频裁剪分辨率设置](docs/video-crop-resolution-v220.png)
 
 ## 为什么是 CSR
 

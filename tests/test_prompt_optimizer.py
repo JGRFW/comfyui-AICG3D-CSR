@@ -67,6 +67,50 @@ class PromptOptimizerTests(unittest.TestCase):
         self.assertIn("强制背景替换", guarded)
         self.assertIn("replace the room", guarded)
 
+    def test_reasoning_sections_are_removed_from_prompt_output(self):
+        raw = (
+            "The user wants a prompt. I need to inspect the images.\n"
+            "<think>internal reasoning that must never reach H3</think>\n"
+            "Replace both people with <Picture 1> and <Picture 2>, then replace the entire background with <Picture 3>."
+        )
+        cleaned = optimizer._clean_output(raw)
+        self.assertTrue(cleaned.startswith("Replace both people"))
+        self.assertNotIn("internal reasoning", cleaned)
+        self.assertFalse(optimizer._is_reasoning_noise(cleaned))
+
+    def test_task_context_overrides_incomplete_background_tag(self):
+        tag, scheme = optimizer.infer_task_from_context(
+            {
+                "images": [
+                    {"kind": "person", "label": "人物参考 1"},
+                    {"kind": "person", "label": "人物参考 2"},
+                    {"kind": "background", "label": "背景参考"},
+                ]
+            },
+            "背景/场景替换",
+            "background_replace",
+        )
+        self.assertEqual(tag, "人物 + 背景")
+        self.assertEqual(scheme, "person_scene")
+
+    def test_prompt_model_is_retried_once_after_reasoning_output(self):
+        payload = {
+            "description": "替换两个人并替换背景",
+            "replacement_tag": "人物 + 背景",
+            "config": {"mode": "api", "vision_enabled": False},
+        }
+        api = mock.AsyncMock(side_effect=[
+            "The user wants me to analyze this. Wait while I think.",
+            "replace both people and the background",
+        ])
+        with (
+            mock.patch.object(optimizer, "_read_config", return_value=dict(optimizer.DEFAULT_CONFIG)),
+            mock.patch.object(optimizer, "_api_optimize", new=api),
+        ):
+            result = asyncio.run(optimizer.optimize_prompt(payload))
+        self.assertIn("replace both people", result)
+        self.assertEqual(api.await_count, 2)
+
     def test_vision_is_disabled_by_default_and_does_not_touch_media(self):
         config = optimizer._normalize_config({})
         self.assertFalse(config["vision_enabled"])

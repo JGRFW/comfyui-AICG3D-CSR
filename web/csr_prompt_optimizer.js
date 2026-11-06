@@ -482,7 +482,8 @@ export function createPromptOptimizer(node, tagSelect) {
       busy(true);
       const visionModelReady = ui.mode.value === "local" ? Boolean(ui.localMmproj.value) : Boolean(ui.visionModel.value.trim());
       const useVision = ui.visionEnabled.checked && visionModelReady;
-      const media = useVision ? visualMediaContext(node) : null;
+      const mediaContext = visualMediaContext(node);
+      const media = useVision ? mediaContext : null;
       const visualCount = Number(Boolean(media?.video)) + (media?.images?.length || 0);
       const statusKind = useVision && !visualCount ? "error" : "";
       status(
@@ -503,6 +504,12 @@ export function createPromptOptimizer(node, tagSelect) {
             replacement_tag: tagSelect.value,
             scheme: scheme.value,
             config: collect(),
+            task_context: {
+              has_video: Boolean(mediaContext.video),
+              video_start: mediaContext.video_start,
+              video_end: mediaContext.video_end,
+              images: mediaContext.images.map(({ kind, label }) => ({ kind, label })),
+            },
             ...(useVision && media ? { media } : {}),
           }),
         });

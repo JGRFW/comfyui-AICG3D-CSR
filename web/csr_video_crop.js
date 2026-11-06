@@ -38,7 +38,7 @@ const CSS = `
 .csr-vc-row input { width:100%; min-width:0; height:25px; border:1px solid #455268; border-radius:5px; background:#131820; color:#edf4fe; padding:0 5px; }
 .csr-vc-row .idx { color:#91a5c2; font-size:10px; }
 .csr-vc-row .arrow { color:#72819a; text-align:center; }
-.csr-vc-status { min-height:15px; color:#8f9eb3; font-size:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.csr-vc-status { min-height:15px; color:#8f9eb3; font-size:10px; overflow-wrap:anywhere; white-space:normal; line-height:1.4; }
 .csr-vc-status.error { color:#ff8f8f; }
 .csr-vc-res { display:flex; flex-direction:column; gap:7px; padding:9px; border:1px solid #354253; border-radius:7px; background:#1b222c; }
 .csr-vc-res-head { display:flex; align-items:center; gap:7px; font-size:11px; color:#dbe7f6; }
@@ -383,6 +383,7 @@ async function uploadVideo(node, file) {
     await loadVideo(node, path);
   } catch (error) {
     node._csrStatus.textContent = String(error?.message || error);
+    node._csrStatus.title = String(error?.message || error);
     node._csrStatus.classList.add("error");
   }
 }
@@ -393,6 +394,9 @@ async function loadVideo(node, file) {
     const response = await api.fetchApi(`/aicg3d_csr/video_info?file=${encodeURIComponent(file)}`);
     const info = await response.json();
     if (!response.ok || info.error) throw new Error(info.error || "读取视频失败");
+    node._csrStatus.textContent = "";
+    node._csrStatus.title = "";
+    node._csrStatus.classList.remove("error");
     node._csrInfo = info;
     renderResolution(node);
     node._csrVideo.src = videoUrl(file);
@@ -412,6 +416,7 @@ async function loadVideo(node, file) {
     commitRows(node);
   } catch (error) {
     node._csrStatus.textContent = String(error?.message || error);
+    node._csrStatus.title = String(error?.message || error);
     node._csrStatus.classList.add("error");
   }
 }

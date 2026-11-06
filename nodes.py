@@ -6,6 +6,7 @@ import json
 import logging
 import math
 import os
+import re
 import time
 from functools import lru_cache, wraps
 from pathlib import Path
@@ -45,7 +46,7 @@ from .sequence_seam import export_with_seam_repair
 
 CATEGORY = "AICG3D-CSR/人物场景替换"
 LOG = logging.getLogger(__name__)
-VERSION = "2.2.0"
+VERSION = "2.2.1"
 
 TARGET_CHOICES = {
     "auto": "自动判断（推荐）",
@@ -73,13 +74,16 @@ ENCODER_CHOICES = {
     "libx264": "libx264（CPU·稳定）",
     "h264_nvenc": "h264_nvenc（NVIDIA加速）",
 }
-DEFAULT_BINDING = (
-    "the target person or object corresponding to replacement reference {index} in the first frame; "
-    "track this same target thereafter and do not substitute unrelated content"
+DEFAULT_BINDING_LINES = (
+    "the leftmost designated source subject, corresponding to replacement reference 1; track this exact target in every frame",
+    "the next distinct source subject to the right, corresponding to replacement reference 2; track this exact target in every frame",
+    "the next distinct source subject to the right, corresponding to replacement reference 3; track this exact target in every frame",
+    "the next distinct source subject to the right, corresponding to replacement reference 4; track this exact target in every frame",
+    "the next distinct source subject to the right, corresponding to replacement reference 5; track this exact target in every frame",
+    "the next distinct source subject to the right, corresponding to replacement reference 6; track this exact target in every frame",
+    "the next distinct source subject to the right, corresponding to replacement reference 7; track this exact target in every frame",
 )
-DEFAULT_BINDINGS = "\n".join(
-    DEFAULT_BINDING.format(index=index) for index in range(1, 8)
-)
+DEFAULT_BINDINGS = "\n".join(DEFAULT_BINDING_LINES)
 DEFAULT_RANGES = json.dumps(
     [{"start": 0.0, "end": 10.0}],
     ensure_ascii=False,
@@ -242,9 +246,89 @@ def parse_bindings(text: str, slots: list[int]) -> list[str]:
     return [
         lines[index - 1].strip()
         if index - 1 < len(lines) and lines[index - 1].strip()
-        else DEFAULT_BINDING.format(index=index)
+        else DEFAULT_BINDING_LINES[min(index, len(DEFAULT_BINDING_LINES)) - 1]
         for index in slots
     ]
+
+
+REASONING_LINE = re.compile(
+    r"^\s*(?:the user wants|the user asks|i need to|i must|i should|let me|wait\b|now write|draft\b|analysis\s*:|reasoning\s*:)",
+    re.IGNORECASE,
+)
+LEGACY_DEFAULT_BINDING = re.compile(
+    r"^(?:the target person or object corresponding to replacement reference|the .*designated source subject, corresponding to replacement reference)",
+    re.IGNORECASE,
+)
+
+
+def clean_replacement_description(value: str) -> str:
+    """Remove optimizer reasoning so it can never be embedded into H3 conditioning."""
+    text = str(value or "").strip()
+    had_reasoning = False
+    for tag in ("think", "analysis", "reasoning"):
+        closing = list(re.finditer(rf"</{tag}\s*>", text, flags=re.IGNORECASE))
+        if closing:
+            had_reasoning = True
+            text = text[closing[-1].end() :]
+        elif re.search(rf"<{tag}\b", text, flags=re.IGNORECASE):
+            had_reasoning = True
+            text = re.sub(
+                rf"<{tag}\b[^>]*>.*$",
+                "",
+                text,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+    text = re.sub(r"<\|(?:channel|analysis|reasoning)\|>", "", text, flags=re.IGNORECASE)
+    kept = []
+    for line in text.splitlines():
+        if REASONING_LINE.search(line):
+            had_reasoning = True
+            continue
+        kept.append(line)
+    text = "\n".join(kept).strip()
+    if had_reasoning and text and text[-1] not in ".!?。！？":
+        complete = list(re.finditer(r"[.!?。！？](?=\s|$)", text))
+        text = text[: complete[-1].end()].strip() if complete else ""
+    return text
+
+
+def effective_binding(binding: str, index: int, total: int, kind: str) -> str:
+    text = str(binding or "").strip()
+    if text and not LEGACY_DEFAULT_BINDING.search(text):
+        return text
+    if total <= 1:
+        position = "the only designated source"
+    elif index == 1:
+        position = "the leftmost designated source"
+    elif index == total:
+        position = "the rightmost designated source"
+    else:
+        position = "the next distinct designated source"
+    noun = "person" if kind == "person" else "object or product"
+    return (
+        f"{position} {noun} in <Video 1>, mapped only to replacement reference {index}; "
+        "track this exact target in every frame and do not reuse it for another target"
+    )
+
+
+def inferred_replacement_tag(subjects: list, objects: list, scene_subject: str | None, fallback: str) -> str:
+    if subjects and objects and scene_subject:
+        return "人物 + 背景 + 物品"
+    if subjects and scene_subject:
+        return "人物 + 背景"
+    if objects and scene_subject:
+        return "物品 + 背景"
+    if subjects and objects:
+        return "人物 + 物品"
+    if scene_subject:
+        return "背景/场景替换"
+    if len(subjects) > 1:
+        return "多人替换"
+    if subjects:
+        return "单人替换"
+    if objects:
+        return "商品替换"
+    return fallback or "自定义"
 
 
 POSITION_HINTS = (
@@ -288,18 +372,37 @@ def references_prompt(references: dict, description: str, replacement_tags: str 
         else:
             master_picture = tag
 
+    subjects = [
+        (subject, tag, effective_binding(binding, index, len(subjects), "person"))
+        for index, (subject, tag, binding) in enumerate(subjects, 1)
+    ]
+    objects = [
+        (subject, tag, effective_binding(binding, index, len(objects), "object"))
+        for index, (subject, tag, binding) in enumerate(objects, 1)
+    ]
+    selected_tag = str(replacement_tags or "自定义").strip()
+    effective_tag = inferred_replacement_tag(subjects, objects, scene_subject, selected_tag)
+
     lines = ["subject_definitions:"]
-    for subject, tag, binding in subjects:
+    person_total = len(subjects)
+    for person_index, (subject, tag, binding) in enumerate(subjects, 1):
         lines.append(
-            f"<Subject {subject}> is the person in {tag}: {binding}. "
+            f"<Subject {subject}> is replacement person {person_index} of exactly {person_total}: {binding}. "
+            f"It is bound one-to-one to {tag} and to one distinct source person only. "
             f"Take facial identity, hairstyle, body proportions and clothing from {tag} only; "
-            f"ignore its background, pose and lighting."
+            "ignore its background, pose and lighting. No other person may reuse this reference."
         )
-    for subject, tag, binding in objects:
+    object_total = len(objects)
+    for object_index, (subject, tag, binding) in enumerate(objects, 1):
         lines.append(
-            f"<Subject {subject}> is the replacement object or prop shown in {tag}: {binding}. "
+            f"<Subject {subject}> is replacement object {object_index} of exactly {object_total}, shown in {tag}: {binding}. "
             f"Take its complete silhouette, scale, colours, material, texture, structure and identifying details from {tag} only; "
             "ignore its background and replace the corresponding source object or prop without redesigning it."
+        )
+    if person_total > 1:
+        lines.append(
+            f"Person count lock: exactly {person_total} distinct source people must be replaced by exactly {person_total} distinct replacement identities. "
+            "Do not merge two targets, omit the less prominent target, duplicate one identity, or replace only the main character."
         )
     if scene_subject:
         scene_index = next(
@@ -312,6 +415,11 @@ def references_prompt(references: dict, description: str, replacement_tags: str 
             "Delete all walls, floors, ceilings, windows, furniture, decor, room layout, materials and lighting patterns from <Video 1>; do not recolour, blur, partially retouch or blend the old scene. "
             f"Do not bring any person from <Picture {scene_index}> into the result."
         )
+        if subjects or objects:
+            lines.append(
+                "The subject replacements and this complete environment replacement are simultaneous mandatory edits. "
+                "Do not replace only the people, do not replace only the scene, and do not treat either task as optional."
+            )
     if master_picture:
         lines.append(
             f"{master_picture} is the approved first frame of this segment, showing the final identities, "
@@ -335,9 +443,12 @@ def references_prompt(references: dict, description: str, replacement_tags: str 
             f"the complete environment behind and around all people in <Video 1> is replaced by {scene_subject}"
         )
     task = "[video editing]"
-    tag_text = str(replacement_tags or "自定义").strip()
-    if tag_text and tag_text != "自定义":
-        task = f"[video editing][{tag_text}]"
+    if effective_tag and effective_tag != "自定义":
+        task = f"[video editing][{effective_tag}]"
+    simultaneous = (
+        "All listed replacements are simultaneous requirements. Satisfy every category in the same output; "
+        "do not satisfy only one person, only one object, or only the background."
+    )
     summary_target = "; ".join(targets)
     if summary_target:
         summary_target = summary_target[0].upper() + summary_target[1:]
@@ -345,7 +456,7 @@ def references_prompt(references: dict, description: str, replacement_tags: str 
         "",
         "summary:",
         f"{task} The target clip is an edit of <Video 1>. {summary_target}. "
-        "Everything else in <Video 1> remains unchanged.",
+        f"{simultaneous} Everything else in <Video 1> remains unchanged.",
         "",
         "retention_analysis:",
         "<Video 1>: fully_preserved - duration, framing, camera movement, subject placement, "
@@ -366,7 +477,7 @@ def references_prompt(references: dict, description: str, replacement_tags: str 
             f"{scene_subject}: attribute_transfer - its entire architecture, room layout, furniture, surfaces, "
             "colours and lighting replace every background region while camera motion follows <Video 1>. "
             "This replacement is compulsory: the original walls, floor, ceiling, furniture, décor and room structure are removed, not merely recoloured. "
-            "Foreground identities, wardrobe, occlusion, contact shadows, motion, framing and timing remain unchanged."
+            "Every specified foreground replacement stays fixed to its own reference, and all occlusion, contact shadows, motion, framing and timing remain coherent."
         )
     if master_picture:
         lines.append(
@@ -399,6 +510,17 @@ def references_prompt(references: dict, description: str, replacement_tags: str 
         shot += (
             "Every replacement object keeps the silhouette, scale, colour, material and structural details from "
             "its own reference image and remains naturally held or placed at the original location. "
+        )
+    if person_total > 1:
+        shot += (
+            f"Person count is locked at exactly {person_total}. Preserve the source person count and replace every designated target, "
+            "using a separate one-to-one reference for each. Do not replace only the most prominent person, do not merge identities, "
+            "do not reuse one reference for two people, and do not leave any designated child or adult unreplaced. "
+        )
+    if scene_subject and (subjects or objects):
+        shot += (
+            "Subject replacement and complete environment replacement are simultaneous mandatory edits. "
+            "Do not return only replaced people with the old background, and do not return only the new background with unreplaced people. "
         )
     shot += description.strip() or (
         "Reproduce <Video 1> frame for frame in composition, subject placement, camera movement and body "
@@ -941,6 +1063,10 @@ class CSRSegmentReplace:
         plan = job_bundle["plan"]
         references = job_bundle["references"]
         model_patch = job_bundle.get("model_patch")
+        raw_description = str(description or "")
+        description = clean_replacement_description(raw_description)
+        if description != raw_description.strip():
+            LOG.warning("AICG3D-CSR: removed prompt-optimizer reasoning or truncated text before H3 conditioning.")
         if file_stamp(plan["source"]) != plan["source_stamp"]:
             raise ValueError("源视频已变化，请重新执行 MiniMax H3 Aicg资源库。")
         if file_stamp(plan["normalized"]) != plan["normalized_stamp"]:

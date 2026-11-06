@@ -35,6 +35,11 @@ VISUAL_IMAGE_LIMIT = 6
 VIDEO_FRAME_LIMIT = 3
 VISUAL_IMAGE_SUFFIXES = {".bmp", ".gif", ".jpeg", ".jpg", ".png", ".tif", ".tiff", ".webp"}
 VIDEO_SUFFIXES = {".avi", ".m4v", ".mkv", ".mov", ".mp4", ".webm"}
+MAX_OUTPUT_TOKENS = {"concise": 500, "balanced": 900, "strong": 1400}
+REASONING_MARKERS = re.compile(
+    r"(?:</?think\b|<\|(?:channel|analysis|reasoning)\|>|^\s*(?:the user wants|i need to|i must|let me|wait\b|now write|draft)\b)",
+    re.IGNORECASE | re.MULTILINE,
+)
 
 DEFAULT_CONFIG = {
     "mode": "api",
@@ -90,7 +95,9 @@ Preserve the user's intended edit. Never add story events, dialogue, camera cuts
 Treat replacement references as property sources, not pose/background/style references unless explicitly requested.
 For background replacement, removal of the original scene structure is mandatory: do not merely recolor, blur, relight, or partially retouch the old environment.
 Keep unspecified foreground subjects, identities, wardrobe, motion, framing, timing, and camera behavior unchanged.
-Return only the final prompt text. Do not return analysis, headings, markdown fences, bullet lists, explanations, or alternative versions.
+Return only the final prompt text. Do not reveal chain-of-thought, reasoning, analysis, planning, or self-correction.
+Never emit <think>, </think>, <analysis>, markdown fences, headings, bullet lists, explanations, or alternative versions.
+If multiple people and a background are requested, all of them are simultaneous mandatory edits. Never reduce the task to only one person or only the background.
 """
 
 SCHEME_RULES = {
@@ -626,6 +633,53 @@ def resolve_scheme(tag: str, requested: str = "auto") -> str:
     return TAG_SCHEMES.get(str(tag or "").strip(), "auto")
 
 
+def infer_task_from_context(context: dict, fallback_tag: str, requested_scheme: str) -> tuple[str, str]:
+    requested = str(requested_scheme or "auto")
+    tag = str(fallback_tag or "自定义").strip()
+    if not isinstance(context, dict):
+        return tag, resolve_scheme(tag, requested)
+    people = 0
+    objects = 0
+    background = False
+    for item in context.get("images") or []:
+        if not isinstance(item, dict):
+            continue
+        kind = str(item.get("kind") or item.get("role") or "").strip().lower()
+        label = str(item.get("label") or "").strip().lower()
+        if kind in {"person", "character"} or "人物" in label:
+            people += 1
+        elif kind in {"object", "product", "item", "prop"} or any(word in label for word in ("物品", "产品", "商品")):
+            objects += 1
+        elif kind in {"background", "scene", "environment"} or any(word in label for word in ("背景", "场景")):
+            background = True
+    if people and background:
+        tag = "人物 + 背景 + 物品" if objects else "人物 + 背景"
+        scheme = "composite" if objects else "person_scene"
+    elif objects and background:
+        tag = "物品 + 背景"
+        scheme = "composite"
+    elif people and objects:
+        tag = "人物 + 物品"
+        scheme = "person_object"
+    elif people > 1:
+        tag = "多人替换"
+        scheme = "multi_person_replace"
+    elif people == 1:
+        tag = "单人替换"
+        scheme = "single_person_replace"
+    elif objects:
+        tag = "商品替换"
+        scheme = "product_replace"
+    elif background:
+        tag = "背景/场景替换"
+        scheme = "background_replace"
+    else:
+        return tag, resolve_scheme(tag, requested)
+    if requested in {"background_repair", "foreground_preserve"}:
+        scheme = requested
+    return tag, scheme
+
+
 def _strength_text(value: str) -> str:
     return {
         "concise": "Keep the final prompt concise and direct.",
@@ -662,11 +716,55 @@ def _extract_content(data: dict) -> str:
     return str(content).strip()
 
 
-def _clean_output(value: str) -> str:
+def _strip_reasoning_sections(value: str) -> str:
     text = str(value or "").strip()
+    for tag in ("think", "analysis", "reasoning"):
+        closing_matches = list(re.finditer(rf"</{tag}\s*>", text, flags=re.IGNORECASE))
+        if closing_matches:
+            text = text[closing_matches[-1].end() :]
+        else:
+            text = re.sub(
+                rf"<{tag}\b[^>]*>.*?</{tag}\s*>",
+                "",
+                text,
+                flags=re.IGNORECASE | re.DOTALL,
+            )
+        text = re.sub(rf"</?{tag}\b[^>]*>", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"<\|(?:channel|analysis|reasoning)\|>", "", text, flags=re.IGNORECASE)
+    return text.strip()
+
+
+def _is_reasoning_noise(value: str) -> bool:
+    return bool(REASONING_MARKERS.search(str(value or "")))
+
+
+def _retry_messages(messages: list[dict], previous: str) -> list[dict]:
+    retry = [dict(message) for message in messages]
+    retry.extend(
+        [
+            {"role": "assistant", "content": str(previous or "")[:6000]},
+            {
+                "role": "user",
+                "content": (
+                    "Your previous response exposed reasoning or was incomplete. Do not explain, analyze, plan, or use think tags. "
+                    "Return only the complete final MiniMax H3 replacement prompt. Do not repeat the analysis."
+                ),
+            },
+        ]
+    )
+    return retry
+
+
+def _clean_output(value: str) -> str:
+    text = _strip_reasoning_sections(str(value or ""))
     text = re.sub(r"^```(?:text|markdown)?\s*", "", text, flags=re.IGNORECASE)
     text = re.sub(r"\s*```$", "", text)
-    text = re.sub(r"^(?:optimized prompt|final prompt|提示词|优化结果)\s*[:：]\s*", "", text, flags=re.IGNORECASE)
+    text = re.sub(
+        r"^(?:optimized prompt|final prompt|提示词|优化结果)\s*[:：]\s*",
+        "",
+        text,
+        flags=re.IGNORECASE,
+    )
     return text.strip()
 
 
@@ -709,7 +807,7 @@ def _api_headers(config: dict) -> dict:
 
 
 def _api_payload(config: dict, messages: list[dict], strength: str) -> dict:
-    max_tokens = {"concise": 350, "balanced": 650, "strong": 950}.get(strength, 650)
+    max_tokens = MAX_OUTPUT_TOKENS.get(strength, MAX_OUTPUT_TOKENS["balanced"])
     payload = {
         "model": config["model"],
         "messages": messages,
@@ -779,7 +877,10 @@ def _get_local_model(config: dict, *, vision: bool = False):
                 if handler_class is None:
                     raise RuntimeError(f"当前 llama-cpp-python 不支持 {handler_name} 视觉处理器，请升级 llama-cpp-python。")
                 projector_arg = "mmproj_path" if handler_name in {"gemma3"} else "clip_model_path"
-                _LOCAL_HANDLER = handler_class(**{projector_arg: str(mmproj_path), "verbose": False})
+                handler_kwargs = {projector_arg: str(mmproj_path), "verbose": False}
+                if handler_name in {"qwen35", "gemma4"}:
+                    handler_kwargs["enable_thinking"] = False
+                _LOCAL_HANDLER = handler_class(**handler_kwargs)
                 kwargs["chat_handler"] = _LOCAL_HANDLER
             _LOCAL_MODEL = Llama(
                 model_path=str(model_path),
@@ -795,7 +896,7 @@ def _get_local_model(config: dict, *, vision: bool = False):
 
 def _local_optimize_sync(config: dict, messages: list[dict], strength: str, *, vision: bool = False) -> str:
     model = _get_local_model(config, vision=vision)
-    max_tokens = {"concise": 350, "balanced": 650, "strong": 950}.get(strength, 650)
+    max_tokens = MAX_OUTPUT_TOKENS.get(strength, MAX_OUTPUT_TOKENS["balanced"])
     with _LOCAL_LOCK:
         result = model.create_chat_completion(
             messages=messages,
@@ -819,7 +920,11 @@ async def optimize_prompt(payload: dict) -> str:
     if not description:
         raise ValueError("请先填写替换描述。")
     tag = str(payload.get("replacement_tag") or "自定义")
-    scheme = resolve_scheme(tag, str(payload.get("scheme") or config["scheme"]))
+    tag, scheme = infer_task_from_context(
+        payload.get("task_context") if isinstance(payload.get("task_context"), dict) else {},
+        tag,
+        str(payload.get("scheme") or config["scheme"]),
+    )
     messages = _messages(description, tag, scheme, config["language"], config["strength"])
     vision_ready = bool(config["vision_enabled"]) and (
         bool(config["local_mmproj"]) if config["mode"] == "local" else bool(config["vision_model"])
@@ -827,23 +932,31 @@ async def optimize_prompt(payload: dict) -> str:
     visual_media = _visual_media(payload.get("media") or {}) if vision_ready else []
     if visual_media:
         messages = _vision_messages(messages, visual_media)
-    try:
+    async def generate(call_messages: list[dict]) -> str:
         if config["mode"] == "local":
-            result = await asyncio.to_thread(
+            return await asyncio.to_thread(
                 _local_optimize_sync,
                 config,
-                messages,
+                call_messages,
                 config["strength"],
                 vision=bool(visual_media),
             )
-        else:
-            result = await _api_optimize(config, messages, config["strength"])
+        return await _api_optimize(config, call_messages, config["strength"])
+
+    try:
+        result = await generate(messages)
+        cleaned = _clean_output(result)
+        if not cleaned or _is_reasoning_noise(cleaned):
+            LOG.warning("Prompt model returned reasoning or an incomplete answer; retrying once.")
+            result = await generate(_retry_messages(messages, result))
+            cleaned = _clean_output(result)
     finally:
         if config["mode"] == "local" and visual_media:
             await asyncio.to_thread(close_local_model)
-    cleaned = _clean_output(result)
     if not cleaned:
         raise RuntimeError("提示词模型返回了空内容。")
+    if _is_reasoning_noise(cleaned):
+        raise RuntimeError("提示词模型返回了分析过程而不是最终提示词，已阻止写入替换描述。请降低温度后重试。")
     return _with_guardrail(cleaned, scheme, config["language"])
 
 

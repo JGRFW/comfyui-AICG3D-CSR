@@ -46,12 +46,15 @@ MiniMax H3 Aicg 加载器 -> MiniMax H3 Aicg 视频裁剪 -> MiniMax H3 Aicg资�
 推荐先用 480 短边和 8 步预览；复杂多人建议拆成多个 CSR ③ 节点顺序替换。
 """
 
-DEFAULT_BINDINGS = "\n".join(
-    "the target person or object corresponding to replacement reference "
-    f"{index} in the first frame; track this same target thereafter and do not "
-    "substitute unrelated content"
-    for index in range(1, 8)
-)
+DEFAULT_BINDINGS = "\n".join([
+    "the leftmost designated source subject, corresponding to replacement reference 1; track this exact target in every frame",
+    "the next distinct source subject to the right, corresponding to replacement reference 2; track this exact target in every frame",
+    "the next distinct source subject to the right, corresponding to replacement reference 3; track this exact target in every frame",
+    "the next distinct source subject to the right, corresponding to replacement reference 4; track this exact target in every frame",
+    "the next distinct source subject to the right, corresponding to replacement reference 5; track this exact target in every frame",
+    "the next distinct source subject to the right, corresponding to replacement reference 6; track this exact target in every frame",
+    "the next distinct source subject to the right, corresponding to replacement reference 7; track this exact target in every frame",
+])
 
 
 class Builder:

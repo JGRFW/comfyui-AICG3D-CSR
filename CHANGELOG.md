@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.2.1
+
+### Replacement Reliability
+
+- Prevent prompt-model chain-of-thought, `<think>` blocks and truncated analysis from being written into H3 replacement descriptions.
+- Added one automatic clean retry when the prompt model returns reasoning instead of a final prompt.
+- Infer the actual replacement task from uploaded asset roles so two people plus a background cannot remain mislabeled as background-only.
+- Added explicit person-count locks and one-to-one reference bindings for multi-person replacement.
+- Require person and background replacement to happen simultaneously when both are supplied.
+- Clear stale video-probe errors after a successful reload and display long errors without truncation.
+
 ## 2.2.0
 
 ### Optional Prompt Vision

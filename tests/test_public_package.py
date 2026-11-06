@@ -34,6 +34,11 @@ class PublicPackageTests(unittest.TestCase):
         self.assertTrue(nodes["CSRMerge"]["widgets_values_named"]["seam_exposure_lock"])
         backend = (ROOT / "nodes.py").read_text(encoding="utf-8")
         self.assertIn("export_with_seam_repair", backend)
+        self.assertIn("All listed replacements are simultaneous requirements", backend)
+        self.assertIn("Person count is locked at exactly", backend)
+        self.assertIn("Do not return only replaced people with the old background", backend)
+        self.assertIn("clean_replacement_description", backend)
+        self.assertIn("the leftmost designated source subject", bindings)
         self.assertIn("hard_cut", (ROOT / "sequence_seam.py").read_text(encoding="utf-8"))
 
     def test_frontend_extensions_and_routes_are_namespaced(self):
@@ -150,6 +155,8 @@ class PublicPackageTests(unittest.TestCase):
 
     def test_video_crop_resolution_uses_horizontal_resolution_and_aspect_controls(self):
         script = (WEB / "csr_video_crop.js").read_text(encoding="utf-8")
+        self.assertIn("node._csrStatus.textContent = \"\";", script)
+        self.assertIn("overflow-wrap:anywhere", script)
         self.assertIn("csr-vc-res-main", script)
         self.assertIn("aspect_ratio", script)
         self.assertIn("模型画布 ${preview.modelWidth}×${preview.modelHeight}", script)

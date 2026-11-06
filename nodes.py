@@ -46,7 +46,7 @@ from .sequence_seam import export_with_seam_repair
 
 CATEGORY = "AICG3D-CSR/人物场景替换"
 LOG = logging.getLogger(__name__)
-VERSION = "2.2.1"
+VERSION = "2.2.2"
 
 TARGET_CHOICES = {
     "auto": "自动判断（推荐）",

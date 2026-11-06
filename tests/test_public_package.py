@@ -103,6 +103,8 @@ class PublicPackageTests(unittest.TestCase):
         self.assertNotIn("Math.ceil(node._csrRoot?.scrollHeight", script)
         self.assertIn("const DEFAULT_VISIBLE_CHARACTERS = 2;", script)
         self.assertIn("const MAX_CHARACTERS = 7;", script)
+        self.assertIn("Character Swap LoRA 建议先降到 0.6 左右", script)
+        self.assertIn("人物与背景将同时替换", script)
         self.assertNotIn("character_8", script)
         self.assertNotIn("character_9", script)
         self.assertNotIn("背景替换已启用：参考/首帧不会锁住旧环境", script)

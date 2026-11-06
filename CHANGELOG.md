@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.2.2
+
+- Added a resource-library warning for multiple people in one frame, recommending lower Character Swap LoRA strength and explicit spatial bindings.
+- Added an explicit warning that uploaded people and background will be treated as simultaneous required replacements.
+
 ## 2.2.1
 
 ### Replacement Reliability

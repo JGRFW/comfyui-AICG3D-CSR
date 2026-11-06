@@ -211,7 +211,8 @@ function renderAssets(node) {
   const characterCount = CHARACTER_KEYS.filter((key) => node._csrAssetState[key]?.file && node._csrAssetState[key]?.kind !== "object").length;
   const objectCount = CHARACTER_KEYS.filter((key) => node._csrAssetState[key]?.file && node._csrAssetState[key]?.kind === "object").length;
   const notices = [];
-  if (characterCount >= 5) notices.push(`${characterCount} 个人物已启用：建议检查一致性或拆分顺序替换`);
+  if (characterCount > 1) notices.push(`${characterCount} 个人物同帧：Character Swap LoRA 建议先降到 0.6 左右，并写明左右位置绑定`);
+  if (characterCount > 0 && node._csrAssetState.background?.file) notices.push("人物与背景将同时替换：两项都必须完成");
   if (objectCount > 0) notices.push(`${objectCount} 个物品/产品参考已启用`);
   if (count > 9) notices.push(`当前 ${count} 张图片参考，超过 H3 单次 9 张上限`);
   node._csrStatus.textContent = notices.join("；");

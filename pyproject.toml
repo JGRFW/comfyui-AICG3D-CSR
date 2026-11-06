@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-AICG3D-CSR"
-version = "2.2.2"
+version = "2.3.0"
 description = "Free-range person/scene replacement with per-segment checkpoints and seamless merge for ComfyUI"
 readme = "README.md"
 requires-python = ">=3.10"

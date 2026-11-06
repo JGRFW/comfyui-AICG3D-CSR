@@ -14,6 +14,7 @@
 - **二采按需开启**：默认直接透传；需要时展开 3D Latent 放大、模型、LoRA、采样器、步数、denoise 和独立断点续跑。
 - **本地提示词优化**：在 `CSR ③` 内接入 Ollama、LM Studio、llama.cpp 等 OpenAI 兼容 API，也可选本地 GGUF，并提供背景强制替换与失败修复方案。
 - **视觉分析可选**：默认只发送文字；主动开启后可读取目标段首/中/尾帧与少量参考图，API 可单独选择视觉模型，本地 GGUF 可选配套 `mmproj`。
+- **第三方加速可桥接**：加载器保留原始 `MODEL` 输出，视频裁剪节点提供可选 `model_patch`，可在不改动主任务包的情况下接 Sage、FlashAttention、TorchCompile 等兼容模型补丁。
 - **分辨率真正可控**：支持 360P、480P、540P、720P、1080P 和自定义尺寸，并实时显示最终模型画布。
 - **素材库默认更轻**：默认显示两个替换物、背景和参考帧四张卡，最多扩展到七个替换物，全部图片参考控制在 H3 的九图上限内。
 - **开源兼容边界清楚**：节点、前端扩展和路由使用独立命名空间，不全局修改 ComfyUI 采样器、注意力后端或画布行为。
@@ -24,6 +25,7 @@
 
 - 中文完整功能、技术细节、适用场景和能力边界：[docs/features.zh-CN.md](docs/features.zh-CN.md)
 - 安装、FFmpeg/ffprobe 与故障排查：[docs/install-and-troubleshooting.md](docs/install-and-troubleshooting.md)
+- 第三方模型加速接入：[docs/acceleration.md](docs/acceleration.md)
 - 四大专用替换 Skill：[skills/README.md](skills/README.md)
 - 替换提示词模板：[docs/replacement-prompts.md](docs/replacement-prompts.md)
 - 本地提示词优化器：[docs/prompt-optimizer.md](docs/prompt-optimizer.md)
@@ -77,6 +79,10 @@ If `参考/首帧` is also uploaded, it is automatically ignored as an environme
 ## FFmpeg and ffprobe
 
 This plugin requires both `ffmpeg` and `ffprobe`. Install them from the same complete FFmpeg build, add that build's `bin` directory to `PATH`, open a new terminal, and verify `ffmpeg -version` and `ffprobe -version` before restarting ComfyUI. `imageio-ffmpeg` does not provide a separate `ffprobe`. Full instructions: [Install and troubleshooting](docs/install-and-troubleshooting.md).
+
+## Optional Third-Party Model Acceleration
+
+The model loader exposes both the CSR task bundle and a raw `MODEL` output. Pass that `MODEL` through compatible third-party acceleration nodes, then connect the final patched `MODEL` to the video-crop `model_patch` input. Leaving `model_patch` unconnected preserves the original single-bundle behavior. See [docs/acceleration.md](docs/acceleration.md).
 
 ## Prompt Optimizer
 
@@ -163,8 +169,8 @@ Measured on the local RTX 5070 Ti test case (2.25 s, two segments, 704x384, 4 st
 
 | Node | Purpose |
 |---|---|
-| `MiniMax H3 Aicg 加载器` | Standalone FL2VA/REF2VA model loader, text encoder, video/audio VAE and 8 LoRA slots |
-| `MiniMax H3 Aicg 视频裁剪` | Source video, target-duration slider, optional sub-segmentation and exact 480P/720P/1080P/custom delivery resolution; outputs one video bundle |
+| `MiniMax H3 Aicg 加载器` | Standalone FL2VA/REF2VA model loader, text encoder, video/audio VAE, 8 LoRA slots, plus `model_bundle` and raw `MODEL` outputs |
+| `MiniMax H3 Aicg 视频裁剪` | Source video, target-duration slider, optional sub-segmentation, exact output resolution and optional third-party `model_patch`; outputs one video bundle |
 | `MiniMax H3 Aicg资源库` | Two visible replacement-object slots by default, expandable to seven, plus background and reference upload; outputs one task bundle |
 | `CSR ③ 逐段替换 · 自动保存 · 断点续跑 · 实时预览` | H3 Ref2VA sampling, live step preview, segment video preview, checkpoint resume, face anchor, continuity context and boundary blending |
 | `CSR ③B 二采放大 · 可选 · 断点续跑` | Optional pass-through/refine stage; latent upscale, independent H3 model/LoRA, sampler schedule, denoise, seed, live preview and resumable refined segments |
@@ -276,6 +282,7 @@ The resource library exposes two replacement-object slots by default and can exp
 - Every HTTP route uses the `/aicg3d_csr/` namespace; the video-info and prompt-optimizer routes do not reuse the original AICG3D endpoints.
 - Uploaded media paths are restricted to ComfyUI `input`, `output`, and `temp` directories.
 - No global ComfyUI node, sampler, attention backend, or canvas behavior is patched.
+- The optional acceleration bridge only passes a user-connected `MODEL` back into the CSR bundle; it does not import or hard-code third-party acceleration plugins.
 - Legacy canvas mode and Nodes 2.0 both receive the measured DOM-widget height. The resource library and video-crop nodes no longer leak content outside their node bodies when Nodes 2.0 is disabled.
 - `Pillow`, `numpy` and `filelock` are declared consistently in `pyproject.toml` and `requirements.txt`.
 - The optional 3D latent upscaler helper is bundled from the MIT-licensed MiniMax H3 Easy project, with attribution in `THIRD_PARTY_NOTICES.md`.

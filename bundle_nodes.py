@@ -12,7 +12,7 @@ import nodes as comfy_nodes
 from .nodes import DEFAULT_BINDINGS, ENCODER_CHOICES, CSRReferences, CSRVideoSegments, resolve_media_path
 
 LOG = logging.getLogger(__name__)
-BUNDLE_VERSION = "1.0.0"
+BUNDLE_VERSION = "1.1.0"
 TASK_CHOICES = ["Ref2VA（推荐）", "FL2VA"]
 ATTENTION_CHOICES = ["ComfyUI 默认"]
 LORA_SLOTS = 8
@@ -160,8 +160,8 @@ class CSRModelLoader:
         }
         return {"required": required, "optional": optional}
 
-    RETURN_TYPES = ("CSR_MODEL_BUNDLE",)
-    RETURN_NAMES = ("model_bundle",)
+    RETURN_TYPES = ("CSR_MODEL_BUNDLE", "MODEL")
+    RETURN_NAMES = ("model_bundle", "model")
     FUNCTION = "load"
     CATEGORY = "AICG3D-CSR/独立节点"
 
@@ -217,7 +217,7 @@ class CSRModelLoader:
             f"{len(applied_loras)} 个 LoRA | CLIP={clip_name} | VAE={video_vae_name}"
         )
         LOG.info("AICG3D-CSR: %s", summary)
-        return (bundle,)
+        return (bundle, model)
 
 
 class CSRVideoCrop:
@@ -242,6 +242,12 @@ class CSRVideoCrop:
             },
             "optional": {
                 "aspect_ratio": (list(ASPECT_RATIO_CHOICES), {"default": "16:9"}),
+                "model_patch": (
+                    "MODEL",
+                    {
+                        "tooltip": "可选。把第三方加速节点处理后的 MODEL 接回任务包；留空时使用加载器原始模型。"
+                    },
+                ),
             },
             "hidden": {"unique_id": "UNIQUE_ID"},
         }
@@ -252,14 +258,21 @@ class CSRVideoCrop:
     CATEGORY = "AICG3D-CSR/独立节点"
 
     @classmethod
-    def IS_CHANGED(cls, video_state="", **kwargs):
+    def IS_CHANGED(cls, video_state="", model_patch=None, **kwargs):
         state = _normalize_video_state(video_state)
         file = state["video"]["file"]
         try:
             stamp = _file_stamp(_media_path(file)) if file else None
         except ValueError:
             stamp = None
-        values = [video_state, stamp, kwargs.get("segment_ranges"), kwargs.get("short_edge"),
+        patch_stamp = None
+        if model_patch is not None:
+            patch_stamp = [
+                id(model_patch),
+                f"{type(model_patch).__module__}.{type(model_patch).__name__}",
+                len(getattr(model_patch, "patches", []) or []),
+            ]
+        values = [video_state, stamp, patch_stamp, kwargs.get("segment_ranges"), kwargs.get("short_edge"),
                   kwargs.get("resolution_preset"), kwargs.get("custom_width"), kwargs.get("custom_height"),
                   kwargs.get("aspect_ratio"),
                   kwargs.get("context_frames"), kwargs.get("seam_blend_frames"), kwargs.get("encoder"),
@@ -299,12 +312,14 @@ class CSRVideoCrop:
         encoder,
         test_seconds=0.0,
         aspect_ratio="16:9",
+        model_patch=None,
         unique_id=None,
     ):
         state = _normalize_video_state(video_state)
         video_file = state["video"]["file"]
         if not video_file:
             raise ValueError("请先在视频裁剪节点中上传源视频。")
+        patched_model = model_patch if model_patch is not None else model_bundle["model"]
         planner = CSRVideoSegments()
         plan, plan_summary = planner.prepare(
             video_file,
@@ -321,11 +336,21 @@ class CSRVideoCrop:
         )
         bundle = {
             **model_bundle,
+            "model": patched_model,
+            "external_model_patch": model_patch is not None,
+            "external_model_patch_type": (
+                f"{type(model_patch).__module__}.{type(model_patch).__name__}" if model_patch is not None else ""
+            ),
             "bundle_type": "CSR_VIDEO_BUNDLE",
             "video_state": state,
             "plan": plan,
             "plan_summary": plan_summary,
         }
+        if model_patch is not None:
+            LOG.info(
+                "AICG3D-CSR video crop: external MODEL patch applied (%s).",
+                bundle["external_model_patch_type"],
+            )
         LOG.info("AICG3D-CSR video crop: %s", plan_summary.splitlines()[0])
         return (bundle,)
 

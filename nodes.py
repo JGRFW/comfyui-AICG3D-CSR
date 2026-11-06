@@ -46,7 +46,7 @@ from .sequence_seam import export_with_seam_repair
 
 CATEGORY = "AICG3D-CSR/人物场景替换"
 LOG = logging.getLogger(__name__)
-VERSION = "2.2.2"
+VERSION = "2.3.0"
 
 TARGET_CHOICES = {
     "auto": "自动判断（推荐）",
@@ -190,6 +190,32 @@ def graph_file_stamps(prompt: dict | None) -> list:
             if path and Path(path).is_file():
                 stamps.append(file_stamp(path))
     return stamps
+
+
+def graph_patch_signature(prompt: dict | None) -> str:
+    """Fingerprint scalar settings from third-party model-patch nodes."""
+    if not prompt:
+        return ""
+    ignored_classes = {"SaveVideo", "PreviewImage", "LoadImage", "Note", "Reroute"}
+    entries = []
+    for node_id, node in sorted(prompt.items(), key=lambda item: str(item[0])):
+        if not isinstance(node, dict):
+            continue
+        class_type = str(node.get("class_type") or "")
+        if not class_type or class_type.startswith("CSR") or class_type in ignored_classes:
+            continue
+        inputs = {}
+        for key, value in (node.get("inputs") or {}).items():
+            if key in {"model", "clip", "vae", "video", "images", "audio"}:
+                continue
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                inputs[key] = value
+        if inputs:
+            entries.append([str(node_id), class_type, inputs])
+    if not entries:
+        return ""
+    encoded = json.dumps(entries, sort_keys=True, ensure_ascii=False, default=str).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()[:24]
 
 
 def tensor_stamp(image: torch.Tensor) -> str:
@@ -1077,6 +1103,11 @@ class CSRSegmentReplace:
         width, height = int(plan["width"]), int(plan["height"])
         characters = [item for item in references["images"] if item["role"] == "character"]
         warnings = []
+        if job_bundle.get("external_model_patch"):
+            LOG.info(
+                "AICG3D-CSR: using external MODEL patch %s for sampling.",
+                job_bundle.get("external_model_patch_type") or "unknown",
+            )
         if references.get("ignored_master_for_scene"):
             warnings.append(
                 "检测到背景替换与参考/首帧同时上传；为避免旧首帧锁住原背景，已自动忽略该首帧的环境引导。"
@@ -1108,6 +1139,8 @@ class CSRSegmentReplace:
             "source_reference_scale": float(source_reference_scale),
             "audio_mode": "separate_track_post_mux",
             "has_model_patch": model_patch is not None,
+            "has_external_model_patch": bool(job_bundle.get("external_model_patch")),
+            "external_model_patch_type": str(job_bundle.get("external_model_patch_type") or ""),
         }
         reference_stamps = [
             {key: value for key, value in item.items() if key != "image"} | {"sha256": tensor_stamp(item["image"])}
@@ -1120,6 +1153,7 @@ class CSRSegmentReplace:
                     settings,
                     reference_stamps,
                     graph_file_stamps(prompt),
+                    graph_patch_signature(prompt),
                     VERSION,
                     "CSR-segment-replace",
                 ],

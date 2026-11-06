@@ -38,6 +38,8 @@ class PublicPackageTests(unittest.TestCase):
         self.assertIn("Person count is locked at exactly", backend)
         self.assertIn("Do not return only replaced people with the old background", backend)
         self.assertIn("clean_replacement_description", backend)
+        self.assertIn("graph_patch_signature(prompt)", backend)
+        self.assertIn("has_external_model_patch", backend)
         self.assertIn("the leftmost designated source subject", bindings)
         self.assertIn("hard_cut", (ROOT / "sequence_seam.py").read_text(encoding="utf-8"))
 
@@ -122,6 +124,16 @@ class PublicPackageTests(unittest.TestCase):
         notices = (ROOT / "THIRD_PARTY_NOTICES.md").read_text(encoding="utf-8")
         self.assertIn("Permission is hereby granted", notices)
 
+    def test_loader_exposes_optional_third_party_model_patch_bridge(self):
+        bundle = (ROOT / "bundle_nodes.py").read_text(encoding="utf-8")
+        self.assertIn('RETURN_TYPES = ("CSR_MODEL_BUNDLE", "MODEL")', bundle)
+        self.assertIn('"model_patch": (', bundle)
+        self.assertIn('"external_model_patch": model_patch is not None', bundle)
+        self.assertIn("return (bundle, model)", bundle)
+        docs = (ROOT / "docs" / "acceleration.md").read_text(encoding="utf-8")
+        self.assertIn("model_bundle -> CSRVideoCrop.model_bundle", docs)
+        self.assertIn("MODEL -> third-party acceleration -> CSRVideoCrop.model_patch", docs)
+
     def test_installation_docs_cover_ffmpeg_ffprobe_and_prompt_optimizer(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         install = (ROOT / "docs" / "install-and-troubleshooting.md").read_text(encoding="utf-8")
@@ -158,6 +170,8 @@ class PublicPackageTests(unittest.TestCase):
     def test_video_crop_resolution_uses_horizontal_resolution_and_aspect_controls(self):
         script = (WEB / "csr_video_crop.js").read_text(encoding="utf-8")
         self.assertIn("node._csrStatus.textContent = \"\";", script)
+        self.assertIn("syncAccelerationStatus", script)
+        self.assertIn("第三方加速：已接入 model_patch", script)
         self.assertIn("overflow-wrap:anywhere", script)
         self.assertIn("csr-vc-res-main", script)
         self.assertIn("aspect_ratio", script)
@@ -183,7 +197,7 @@ class PublicPackageTests(unittest.TestCase):
     def test_saved_workflow_uses_only_one_output_per_processing_node(self):
         workflow = json.loads((ROOT / "workflows" / "AICG3D-CSR_视频裁剪_资源库_单线.json").read_text(encoding="utf-8"))
         processing = [node for node in workflow["nodes"] if node["type"] != "Note"]
-        self.assertTrue(all(len(node["outputs"]) == 1 for node in processing))
+        self.assertTrue(all(sum(len(output.get("links") or []) for output in node["outputs"]) <= 1 for node in processing))
         self.assertEqual(len(workflow["links"]), len(processing) - 1)
 
 

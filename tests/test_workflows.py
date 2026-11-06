@@ -25,7 +25,11 @@ class SplitWorkflowTests(unittest.TestCase):
             ],
         )
         self.assertEqual(len(workflow["links"]), 6)
-        self.assertTrue(all(len(node["outputs"]) == 1 for node in nodes))
+        self.assertTrue(all(sum(len(output.get("links") or []) for output in node["outputs"]) <= 1 for node in nodes))
+        loader = nodes[0]
+        self.assertEqual([output["name"] for output in loader["outputs"]], ["model_bundle", "model"])
+        crop = nodes[1]
+        self.assertIn("model_patch", [item["name"] for item in crop["inputs"]])
 
     def test_split_api_uses_flat_save_video_inputs(self):
         workflow = json.loads(API_WORKFLOW.read_text(encoding="utf-8"))

@@ -20,6 +20,7 @@ MiniMax H3 Aicg 加载器 -> MiniMax H3 Aicg资源库 -> CSR ③ 逐段替换 ->
 1. 所有主模型、文本编码器、视频 VAE、音频 VAE 和 LoRA 都在独立加载器中设置。
 2. 源视频、替换参考 1-9、背景图和参考首帧都在独立资源库中上传，缩略图完整显示。
 3. 资源库先用时长和滑块选择任意目标裁剪段，例如 10 秒或 15 秒；目标窗口内仍可继续自由分段。
+3.1 加载器额外提供原始 MODEL 输出；可接入第三方加速链，再把最终 MODEL 接回视频裁剪的 model_patch。未连接时完全沿用原始模型。
 4. 每个节点之间只有一根线：模型包 -> 任务包 -> 分段结果 -> 最终视频。
 5. CSR ③ 底部显示当前段、采样步数、剩余时间和实时画面；每段完成后直接播放该段 MP4。
 6. 音频在资源库阶段自动剥离，不进入任何分段；CSR ④ 合并完成后才把 source_audio.wav 封装进去。
@@ -36,7 +37,8 @@ MiniMax H3 Aicg 加载器 -> MiniMax H3 Aicg 视频裁剪 -> MiniMax H3 Aicg资�
 
 1. 视频裁剪节点只负责源视频上传、音轨剥离、目标时长、滑块定位和自由分段。
 2. 资源库节点负责替换参考 1-9（人物或物品）、背景图和参考首帧；所有图片使用完整缩略图显示。
-3. 两个素材节点之间仍然只有一根视频任务包连线，整条链每个节点只保留一个输出口。
+2.1 加载器额外提供原始 MODEL 输出；可接第三方加速节点，最终 MODEL 接回视频裁剪节点的 model_patch。未连接时保持原始单线行为。
+3. 主数据链仍然只有一根视频任务包连线；加载器额外的 MODEL 输出只用于可选第三方加速支线。
 4. CSR ③ 底部显示当前段、采样步数、剩余时间和实时画面；每段完成后直接播放该段 MP4。
 5. 音频在视频裁剪阶段自动剥离，不进入任何分段；CSR ④ 合并完成后才把 source_audio.wav 封装进去。
 6. CSR ③ 的“替换标签”可选择人物、背景、物品或组合场景，并一键应用对应提示词模板。
@@ -113,7 +115,7 @@ def build():
     builder = Builder()
     builder.add(1, "CSRModelLoader", "MiniMax H3 Aicg 加载器 · CSR独立版", (-1220, -500),
                 (500, 760), loader,
-                outputs=[("model_bundle", "CSR_MODEL_BUNDLE")])
+                outputs=[("model_bundle", "CSR_MODEL_BUNDLE"), ("model", "MODEL")])
     builder.add(2, "CSRMediaLibrary", "MiniMax H3 Aicg资源库 · CSR独立版", (-610, -500),
                 (560, 980),
                 {"media_state": "{}",
@@ -171,7 +173,7 @@ def build_split():
     builder = Builder()
     builder.add(1, "CSRModelLoader", "MiniMax H3 Aicg 加载器 · CSR独立版", (-1540, -520),
                 (500, 760), loader,
-                outputs=[("model_bundle", "CSR_MODEL_BUNDLE")])
+                outputs=[("model_bundle", "CSR_MODEL_BUNDLE"), ("model", "MODEL")])
     builder.add(2, "CSRVideoCrop", "MiniMax H3 Aicg 视频裁剪 · CSR独立版", (-940, -520),
                 (540, 660),
                 {"video_state": "{}",
@@ -180,7 +182,7 @@ def build_split():
                  "resolution_preset": "540P", "custom_width": 0, "custom_height": 0,
                  "context_frames": 22, "seam_blend_frames": 3,
                  "encoder": "libx264（CPU·稳定）", "test_seconds": 0.0, "aspect_ratio": "16:9"},
-                inputs=[("model_bundle", "CSR_MODEL_BUNDLE")],
+                inputs=[("model_bundle", "CSR_MODEL_BUNDLE"), ("model_patch", "MODEL")],
                 outputs=[("video_bundle", "CSR_VIDEO_BUNDLE")])
     builder.connect(1, 0, 2, "model_bundle")
     builder.add(3, "CSRMediaAssets", "MiniMax H3 Aicg资源库 · CSR独立版", (-300, -520),

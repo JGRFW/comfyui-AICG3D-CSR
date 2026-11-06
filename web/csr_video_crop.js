@@ -40,6 +40,7 @@ const CSS = `
 .csr-vc-row .arrow { color:#72819a; text-align:center; }
 .csr-vc-status { min-height:15px; color:#8f9eb3; font-size:10px; overflow-wrap:anywhere; white-space:normal; line-height:1.4; }
 .csr-vc-status.error { color:#ff8f8f; }
+.csr-vc-status.accel { color:#8fd8b2; }
 .csr-vc-res { display:flex; flex-direction:column; gap:7px; padding:9px; border:1px solid #354253; border-radius:7px; background:#1b222c; }
 .csr-vc-res-head { display:flex; align-items:center; gap:7px; font-size:11px; color:#dbe7f6; }
 .csr-vc-res-head .hint { margin-left:auto; color:#8fa1b9; font-size:10px; }
@@ -93,6 +94,17 @@ function setWidget(node, widgetNode, value) {
 
 function setValue(node, name, value) {
   setWidget(node, widget(node, name), value);
+}
+
+function syncAccelerationStatus(node) {
+  const status = node?._csrAccelerationStatus;
+  if (!status) return;
+  const input = node.inputs?.find((item) => item.name === "model_patch");
+  const connected = input?.link !== null && input?.link !== undefined;
+  status.textContent = connected
+    ? "第三方加速：已接入 model_patch，将使用加速后的 MODEL 采样"
+    : "第三方加速：未接入，将使用加载器原始 MODEL";
+  status.classList.toggle("accel", connected);
 }
 
 function readVideoState(node) {
@@ -446,6 +458,8 @@ function createPanel(node) {
   root.append(videoBar);
   const audio = el("div", "csr-vc-status", "音轨：等待源视频");
   root.append(audio);
+  const accelerationStatus = el("div", "csr-vc-status", "第三方加速：未接入，将使用加载器原始 MODEL");
+  root.append(accelerationStatus);
 
   const resolutionBox = el("div", "csr-vc-res");
   const resolutionHead = el("div", "csr-vc-res-head");
@@ -576,6 +590,7 @@ function createPanel(node) {
     _csrVideoEmpty: videoEmpty,
     _csrVideoName: videoName,
     _csrAudio: audio,
+    _csrAccelerationStatus: accelerationStatus,
     _csrResolutionSelect: resolutionSelect,
     _csrAspectSelect: aspectSelect,
     _csrCustomWidth: customWidth,
@@ -647,6 +662,7 @@ function createPanel(node) {
   });
   renderRows(node);
   syncResolutionControls(node);
+  syncAccelerationStatus(node);
   if (node._csrVideoState.video?.file) loadVideo(node, node._csrVideoState.video.file);
   setTimeout(() => {
     syncPanelHeight(node);
@@ -674,9 +690,16 @@ app.registerExtension({
         this._csrRows = parseRows(this._csrRangeWidget?.value);
         renderRows(this);
         syncResolutionControls(this);
+        syncAccelerationStatus(this);
         if (this._csrVideoState.video?.file) loadVideo(this, this._csrVideoState.video.file);
         requestAnimationFrame(() => syncPanelHeight(this));
       }, 0);
+      return result;
+    };
+    const originalConnectionsChange = nodeType.prototype.onConnectionsChange;
+    nodeType.prototype.onConnectionsChange = function (...args) {
+      const result = originalConnectionsChange?.apply(this, args);
+      syncAccelerationStatus(this);
       return result;
     };
   },

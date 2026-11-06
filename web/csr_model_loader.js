@@ -245,7 +245,11 @@ function createPanel(node) {
     rebuild();
   };
   root.append(loraSec);
-  const note = el("div", "csr-loader-note", "下拉列表可滚动选择；圆形开关只停用 LoRA，不会清除选择或强度");
+  const note = el(
+    "div",
+    "csr-loader-note",
+    "下拉列表可滚动选择；圆形开关只停用 LoRA。右侧额外 model 输出可接第三方加速链，未使用时可保持空置。",
+  );
   root.append(note);
 
   Object.assign(node, { _csrNamedSelects: namedSelects, _csrLoraRows: rows, _csrLoraRebuild: rebuild });

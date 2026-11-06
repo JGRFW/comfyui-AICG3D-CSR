@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.3.0
+
+### Optional Third-Party Acceleration Bridge
+
+- The CSR model loader now exposes the original `MODEL` output alongside `model_bundle`.
+- The video-crop node now accepts an optional `model_patch` MODEL input and writes it back into the CSR bundle.
+- Compatible SageAttention, FlashAttention, TorchCompile, patch-order and sampling-shift nodes can now participate in CSR sampling without modifying the main bundle line.
+- Disconnecting `model_patch` automatically falls back to the loader's original model.
+- Third-party patch scalar settings are included in CSR segment checkpoint fingerprints.
+- Added an acceleration status indicator and compatibility documentation.
+
 ## 2.2.2
 
 - Added a resource-library warning for multiple people in one frame, recommending lower Character Swap LoRA strength and explicit spatial bindings.
